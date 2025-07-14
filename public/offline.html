@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BarberClub - Sin conexión</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        
+        .icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            background-color: #b02e2e;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+        }
+        
+        h1 {
+            font-size: 24px;
+            margin-bottom: 16px;
+            color: #ffffff;
+        }
+        
+        p {
+            font-size: 16px;
+            margin-bottom: 24px;
+            color: #cccccc;
+            line-height: 1.5;
+        }
+        
+        .button {
+            background-color: #b02e2e;
+            color: #ffffff;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .button:hover {
+            background-color: #941f1f;
+        }
+        
+        .features {
+            margin-top: 40px;
+            text-align: left;
+        }
+        
+        .features h2 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            color: #ffffff;
+        }
+        
+        .features ul {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .features li {
+            padding: 8px 0;
+            color: #cccccc;
+            border-bottom: 1px solid #333333;
+        }
+        
+        .features li:last-child {
+            border-bottom: none;
+        }
+        
+        .features li:before {
+            content: "✓";
+            color: #b02e2e;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">
+            📱
+        </div>
+        
+        <h1>Sin conexión a internet</h1>
+        
+        <p>
+            No hay conexión a internet en este momento. Algunas funciones pueden no estar disponibles.
+        </p>
+        
+        <button class="button" onclick="window.location.reload()">
+            Intentar de nuevo
+        </button>
+        
+        <div class="features">
+            <h2>Funciones disponibles sin conexión:</h2>
+            <ul>
+                <li>Consultar horarios guardados</li>
+                <li>Ver información de contacto</li>
+                <li>Revisar servicios disponibles</li>
+                <li>Acceder a la información de la barbería</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        // Check for connectivity
+        function checkConnection() {
+            if (navigator.onLine) {
+                window.location.reload();
+            }
+        }
+        
+        // Listen for online event
+        window.addEventListener('online', checkConnection);
+        
+        // Check periodically
+        setInterval(checkConnection, 10000);
+    </script>
+</body>
+</html>
