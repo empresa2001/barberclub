@@ -19,28 +19,6 @@ export function PWAProvider({ children }: PWAProviderProps) {
           console.log('SW registration failed: ', registrationError);
         });
     }
-
-    // Instalar PWA prompt
-    let deferredPrompt: any;
-    
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      
-      // Mostrar botón de instalación después de un delay
-      setTimeout(() => {
-        const installButton = document.getElementById('install-pwa-button');
-        if (installButton) {
-          installButton.style.display = 'block';
-        }
-      }, 5000);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
   }, []);
 
   return <>{children}</>;

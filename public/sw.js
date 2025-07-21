@@ -1,12 +1,9 @@
 // Service Worker for BarberClub PWA
-const CACHE_NAME = 'barberclub-v1';
+const CACHE_NAME = 'barberclub-v3';
 const urlsToCache = [
   '/',
-  '/static/js/bundle.js',
-  '/static/css/main.css',
   '/manifest.json',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png',
+  '/favicon.ico',
   '/offline.html'
 ];
 

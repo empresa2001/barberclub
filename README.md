@@ -1,6 +1,6 @@
 # BarberClub - Gestión de Barberías PWA
 
-Una aplicación web progresiva (PWA) moderna para la gestión integral de barberías, construida con Next.js, TypeScript, Tailwind CSS y Supabase.
+Una aplicación web progresiva (PWA) moderna para la gestión integral de barberías, construida con Next.js, TypeScript, Tailwind CSS y backend Node.js con MySQL.
 
 ## 🚀 Características
 
@@ -46,8 +46,8 @@ Una aplicación web progresiva (PWA) moderna para la gestión integral de barber
 - **Lucide React**: Iconografía moderna
 
 ### Backend
-- **Supabase**: Base de datos PostgreSQL
-- **Supabase Auth**: Autenticación y autorización
+- **MySQL**: Base de datos relacional
+- **Node.js**: Backend API REST con autenticación JWT
 - **Row Level Security (RLS)**: Seguridad a nivel de fila
 
 ### PWA
@@ -73,17 +73,16 @@ npm install
 cp .env.local.example .env.local
 ```
 
-Editar `.env.local` con tus credenciales de Supabase:
+Editar `.env.local` con la configuración de tu backend:
 ```env
-NEXT_PUBLIC_SUPABASE_URL=tu_url_de_supabase
-NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_clave_anonima_de_supabase
+NEXT_PUBLIC_API_URL=http://localhost:3001/api
 ```
 
 4. **Configurar la base de datos**
 ```bash
-# Ejecutar en Supabase SQL Editor
-# 1. Ejecutar supabase/schema.sql
-# 2. Ejecutar supabase/rls-policies.sql
+# Ejecutar en MySQL
+# 1. Ejecutar database/schema.sql
+# 2. Ver BACKEND_SETUP.md para configurar el backend Node.js
 ```
 
 5. **Ejecutar en desarrollo**
@@ -110,10 +109,10 @@ barberclub/
 │   │   ├── forms/            # Formularios
 │   │   └── layout/           # Componentes de layout
 │   ├── lib/                   # Utilidades y configuraciones
-│   │   ├── supabase.ts       # Cliente de Supabase
+│   │   ├── api.ts           # Cliente API para backend Node.js
 │   │   └── utils.ts          # Funciones auxiliares
 │   └── types/                 # Definiciones TypeScript
-├── supabase/
+├── database/
 │   ├── schema.sql            # Esquema de base de datos
 │   └── rls-policies.sql      # Políticas de seguridad
 ├── tailwind.config.ts        # Configuración Tailwind

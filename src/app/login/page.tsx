@@ -177,39 +177,38 @@ export default function LoginPage() {
   ]
 
   return (
- <div className="!min-h-screen !bg-gradient-to-br !from-slate-950 !via-gray-950 !to-slate-900 !relative !overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-gray-950 to-slate-900 relative overflow-hidden">
       {/* Sophisticated Background Elements */}
-      <div className="!absolute !inset-0 !pointer-events-none">
+      <div className="absolute inset-0 pointer-events-none">
         {/* Primary gradient orb */}
-        <div className="!absolute !top-0 !right-0 !w-[800px] !h-[800px] !bg-gradient-to-br !from-barbershop-red/8 !via-red-600/4 !to-transparent !rounded-full !blur-3xl !animate-pulse"></div>
+        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-gradient-to-br from-barbershop-red/8 via-red-600/4 to-transparent rounded-full blur-3xl animate-pulse"></div>
         {/* Secondary accent */}
-        <div className="!absolute !bottom-0 !left-0 !w-[600px] !h-[600px] !bg-gradient-to-tr !from-barbershop-blue/6 !via-blue-600/3 !to-transparent !rounded-full !blur-3xl !animate-pulse !delay-2000"></div>
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-gradient-to-tr from-barbershop-blue/6 via-blue-600/3 to-transparent rounded-full blur-3xl animate-pulse delay-2000"></div>
         {/* Tertiary depth layer */}
-        <div className="!absolute !top-1/2 !left-1/2 !transform !-translate-x-1/2 !-translate-y-1/2 !w-[1000px] !h-[1000px] !bg-gradient-radial !from-barbershop-red/2 !via-transparent !to-transparent !rounded-full !animate-pulse !delay-1000"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] bg-gradient-radial from-barbershop-red/2 via-transparent to-transparent rounded-full animate-pulse delay-1000"></div>
       </div>
 
-      <div className="!flex !items-center !justify-center !min-h-screen !p-6 !relative">
+      <div className="flex items-center justify-center min-h-screen p-6 relative">
         {/* Back Button */}
         <Link
           href="/"
-          className="!absolute !top-8 !left-8 !inline-flex !items-center !px-4 !py-2 !text-gray-300 hover:!text-white !bg-white/5 hover:!bg-white/10 !backdrop-blur-sm !border !border-white/10 !rounded-full !transition-all !duration-300 group focus:!outline-none focus:!ring-2 focus:!ring-barbershop-red/50"
+          className="absolute top-4 left-4 sm:top-8 sm:left-8 inline-flex items-center px-3 sm:px-4 py-2 text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 rounded-full transition-all duration-300 group focus:outline-none focus:ring-2 focus:ring-barbershop-red/50"
           aria-label="Volver al inicio"
         >
-          <ArrowLeft className="!h-4 !w-4 !mr-2 group-hover:!-translate-x-0.5 !transition-transform !duration-300" />
-          <span className="!text-sm !font-medium">Inicio</span>
+          <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 group-hover:-translate-x-0.5 transition-transform duration-300" />
+          <span className="text-xs sm:text-sm font-medium">Inicio</span>
         </Link>
 
-        <div className="!w-full !max-w-lg">
+        <div className="w-full max-w-lg mt-12">
           {/* Logo Section */}
-          <div className="!text-center !mb-12">
-            <Logo size="lg" className="!justify-center" />
+          <div className="text-center mb-12">
+            <Logo size="lg" className="justify-center" />
           </div>
 
           {/* Role Selection */}
-                    {/* Role Selection */}
-          <div className="!mb-10">
-            <h2 className="!text-xl !font-semibold !text-white !mb-6 !text-center">Selecciona tu perfil</h2>
-            <div className="!space-y-3" role="radiogroup" aria-label="Seleccionar rol de usuario">
+          <div className="mb-10">
+            <h2 className="text-xl font-semibold text-white mb-6 text-center">Selecciona tu perfil</h2>
+            <div className="space-y-3" role="radiogroup" aria-label="Seleccionar rol de usuario">
               {roles.map((role) => {
                 const IconComponent = role.icon
                 const isSelected = selectedRole === role.id
@@ -221,52 +220,52 @@ export default function LoginPage() {
                     aria-checked={isSelected}
                     aria-label={`${role.label}: ${role.description}`}
                     className={`
-                      !relative !w-full !p-5 !rounded-2xl !border-2 !transition-all !duration-500 group 
-                      focus:!outline-none focus:!ring-2 focus:!ring-barbershop-red/50 focus:!ring-offset-2 focus:!ring-offset-transparent
-                      !backdrop-blur-sm hover:!backdrop-blur-md
+                      relative w-full p-5 rounded-2xl border-2 transition-all duration-500 group 
+                      focus:outline-none focus:ring-2 focus:ring-barbershop-red/50 focus:ring-offset-2 focus:ring-offset-transparent
+                      backdrop-blur-sm hover:backdrop-blur-md
                       ${
                         isSelected
-                          ? `${role.selectedColor} !transform !scale-[1.02]`
-                          : `!border-white/10 !bg-white/5 hover:!bg-white/10 hover:!border-white/20 hover:!scale-[1.01]`
+                          ? `${role.selectedColor} transform scale-[1.02]`
+                          : `border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 hover:scale-[1.01]`
                       }
                     `}
                   >
-                    <div className="!flex !items-center !space-x-4">
+                    <div className="flex items-center space-x-4">
                       <div
                         className={`
-                        !p-3 !rounded-xl !transition-all !duration-300 
+                        p-3 rounded-xl transition-all duration-300 
                         ${
                           isSelected
-                            ? `!bg-gradient-to-br ${role.color.includes("barbershop-red") ? "!from-barbershop-red/20 !to-barbershop-red/10" : role.color.includes("barbershop-blue") ? "!from-barbershop-blue/20 !to-barbershop-blue/10" : "!from-amber-400/20 !to-amber-400/10"}`
-                            : "!bg-white/10 group-hover:!bg-white/15"
+                            ? `bg-gradient-to-br ${role.color.includes("barbershop-red") ? "from-barbershop-red/20 to-barbershop-red/10" : role.color.includes("barbershop-blue") ? "from-barbershop-blue/20 to-barbershop-blue/10" : "from-amber-400/20 to-amber-400/10"}`
+                            : "bg-white/10 group-hover:bg-white/15"
                         }
                       `}
                       >
                         <IconComponent
                           className={`
-                          !h-6 !w-6 !transition-all !duration-300
-                          ${isSelected ? role.color.split(" ")[0] : "!text-gray-300 group-hover:!text-white"}
+                          h-6 w-6 transition-all duration-300
+                          ${isSelected ? role.color.split(" ")[0] : "text-gray-300 group-hover:text-white"}
                         `}
                         />
                       </div>
-                      <div className="!text-left !flex-1">
+                      <div className="text-left flex-1">
                         <div
                           className={`
-                          !font-semibold !text-lg !transition-colors !duration-300
-                          ${isSelected ? "!text-white" : "!text-gray-200 group-hover:!text-white"}
+                          font-semibold text-lg transition-colors duration-300
+                          ${isSelected ? "text-white" : "text-gray-200 group-hover:text-white"}
                         `}
                         >
                           {role.label}
                         </div>
-                        <div className="!text-sm !text-gray-400 group-hover:!text-gray-300 !transition-colors !duration-300">
+                        <div className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors duration-300">
                           {role.description}
                         </div>
                       </div>
                     </div>
                     {isSelected && (
-                      <div className="!absolute !top-4 !right-4">
-                        <div className="!bg-white/20 !rounded-full !p-1">
-                          <CheckCircle className="!w-5 !h-5 !text-white !animate-scale-in" />
+                      <div className="absolute top-4 right-4">
+                        <div className="bg-white/20 rounded-full p-1">
+                          <CheckCircle className="w-5 h-5 text-white animate-scale-in" />
                         </div>
                       </div>
                     )}
@@ -277,28 +276,28 @@ export default function LoginPage() {
           </div>
 
           {/* Login Form */}
-          <div className="!bg-gradient-to-br !from-white/10 !to-white/5 !backdrop-blur-xl !border !border-white/20 !shadow-2xl !rounded-3xl !p-8 hover:!shadow-barbershop-red/10 !transition-all !duration-700">
-            <form onSubmit={handleSubmit} className="!space-y-6" noValidate>
+          <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 shadow-2xl rounded-3xl p-8 hover:shadow-barbershop-red/10 transition-all duration-700">
+            <form onSubmit={handleSubmit} className="space-y-6" noValidate>
               {/* General Error Message */}
               {errors.general && (
-                <div className="!flex !items-center !space-x-3 !p-4 !bg-red-500/10 !border !border-red-500/20 !rounded-xl !backdrop-blur-sm !animate-shake">
-                  <div className="!bg-red-500/20 !rounded-full !p-1">
-                    <AlertCircle className="!h-5 !w-5 !text-red-400 !flex-shrink-0" />
+                <div className="flex items-center space-x-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl backdrop-blur-sm animate-shake">
+                  <div className="bg-red-500/20 rounded-full p-1">
+                    <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0" />
                   </div>
-                  <span className="!text-red-300 !text-sm !font-medium">{errors.general}</span>
+                  <span className="text-red-300 text-sm font-medium">{errors.general}</span>
                 </div>
               )}
 
               {/* Email Field */}
-              <div className="!relative group">
-                <label htmlFor="email" className="!block !text-sm !font-medium !text-gray-300 !mb-2">
+              <div className="relative group">
+                <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
                   Correo electrónico
                 </label>
-                <div className="!relative">
-                  <div className="!absolute !inset-y-0 !left-0 !pl-4 !flex !items-center !pointer-events-none">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <Mail
-                      className={`!h-5 !w-5 !transition-colors !duration-300 ${
-                        errors.email ? "!text-red-400" : "!text-gray-400 group-focus-within:!text-barbershop-red"
+                      className={`h-5 w-5 transition-colors duration-300 ${
+                        errors.email ? "text-red-400" : "text-gray-400 group-focus-within:text-barbershop-red"
                       }`}
                     />
                   </div>
@@ -314,36 +313,36 @@ export default function LoginPage() {
                     aria-invalid={!!errors.email}
                     aria-describedby={errors.email ? "email-error" : undefined}
                     className={`
-                      !w-full !pl-12 !pr-4 !py-4 !bg-white/5 !border-2 !rounded-xl
-                      !text-white !placeholder-gray-400 !text-lg
-                      focus:!outline-none focus:!ring-2 focus:!ring-barbershop-red/50 focus:!border-barbershop-red/50
-                      !transition-all !duration-300 !backdrop-blur-sm
-                      hover:!bg-white/10 hover:!border-white/30
-                      ${errors.email ? "!border-red-500/50 focus:!ring-red-500/50 focus:!border-red-500/50" : "!border-white/20"}
+                      w-full pl-12 pr-4 py-4 bg-white/5 border-2 rounded-xl
+                      text-white placeholder-gray-400 text-lg
+                      focus:outline-none focus:ring-2 focus:ring-barbershop-red/50 focus:border-barbershop-red/50
+                      transition-all duration-300 backdrop-blur-sm
+                      hover:bg-white/10 hover:border-white/30
+                      ${errors.email ? "border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50" : "border-white/20"}
                     `}
                   />
                 </div>
                 {errors.email && (
                   <div
                     id="email-error"
-                    className="!flex !items-center !space-x-2 !mt-3 !text-red-300 !text-sm !animate-fade-in"
+                    className="flex items-center space-x-2 mt-3 text-red-300 text-sm animate-fade-in"
                   >
-                    <AlertCircle className="!h-4 !w-4 !flex-shrink-0" />
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
                     <span>{errors.email}</span>
                   </div>
                 )}
               </div>
 
               {/* Password Field */}
-              <div className="!relative group">
-                <label htmlFor="password" className="!block !text-sm !font-medium !text-gray-300 !mb-2">
+              <div className="relative group">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
                   Contraseña
                 </label>
-                <div className="!relative">
-                  <div className="!absolute !inset-y-0 !left-0 !pl-4 !flex !items-center !pointer-events-none">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <Lock
-                      className={`!h-5 !w-5 !transition-colors !duration-300 ${
-                        errors.password ? "!text-red-400" : "!text-gray-400 group-focus-within:!text-barbershop-red"
+                      className={`h-5 w-5 transition-colors duration-300 ${
+                        errors.password ? "text-red-400" : "text-gray-400 group-focus-within:text-barbershop-red"
                       }`}
                     />
                   </div>
@@ -359,29 +358,29 @@ export default function LoginPage() {
                     aria-invalid={!!errors.password}
                     aria-describedby={errors.password ? "password-error" : undefined}
                     className={`
-                      !w-full !pl-12 !pr-14 !py-4 !bg-white/5 !border-2 !rounded-xl
-                      !text-white !placeholder-gray-400 !text-lg
-                      focus:!outline-none focus:!ring-2 focus:!ring-barbershop-red/50 focus:!border-barbershop-red/50
-                      !transition-all !duration-300 !backdrop-blur-sm
-                      hover:!bg-white/10 hover:!border-white/30
-                      ${errors.password ? "!border-red-500/50 focus:!ring-red-500/50 focus:!border-red-500/50" : "!border-white/20"}
+                      w-full pl-12 pr-14 py-4 bg-white/5 border-2 rounded-xl
+                      text-white placeholder-gray-400 text-lg
+                      focus:outline-none focus:ring-2 focus:ring-barbershop-red/50 focus:border-barbershop-red/50
+                      transition-all duration-300 backdrop-blur-sm
+                      hover:bg-white/10 hover:border-white/30
+                      ${errors.password ? "border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50" : "border-white/20"}
                     `}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                    className="!absolute !inset-y-0 !right-0 !pr-4 !flex !items-center !text-gray-400 hover:!text-white !transition-colors !duration-300 focus:!outline-none focus:!text-barbershop-red"
+                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-white transition-colors duration-300 focus:outline-none focus:text-barbershop-red"
                   >
-                    {showPassword ? <EyeOff className="!h-5 !w-5" /> : <Eye className="!h-5 !w-5" />}
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
                 {errors.password && (
                   <div
                     id="password-error"
-                    className="!flex !items-center !space-x-2 !mt-3 !text-red-300 !text-sm !animate-fade-in"
+                    className="flex items-center space-x-2 mt-3 text-red-300 text-sm animate-fade-in"
                   >
-                    <AlertCircle className="!h-4 !w-4 !flex-shrink-0" />
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
                     <span>{errors.password}</span>
                   </div>
                 )}
@@ -392,42 +391,42 @@ export default function LoginPage() {
                 type="submit"
                 disabled={isLoading || !isFormValid}
                 className={`
-                  !w-full !py-4 !rounded-xl !font-semibold !text-lg
-                  !transform !transition-all !duration-500
-                  !shadow-lg hover:!shadow-2xl
-                  !relative !overflow-hidden group
-                  focus:!outline-none focus:!ring-2 focus:!ring-barbershop-red/50 focus:!ring-offset-2 focus:!ring-offset-transparent
+                  w-full py-4 rounded-xl font-semibold text-lg
+                  transform transition-all duration-500
+                  shadow-lg hover:shadow-2xl
+                  relative overflow-hidden group
+                  focus:outline-none focus:ring-2 focus:ring-barbershop-red/50 focus:ring-offset-2 focus:ring-offset-transparent
                   ${
                     isFormValid && !isLoading
-                      ? "!bg-gradient-to-r !from-barbershop-red !to-red-600 !text-white hover:!from-barbershop-red/90 hover:!to-red-600/90 hover:!scale-[1.02] hover:!shadow-barbershop-red/30"
-                      : "!bg-gray-600/50 !text-gray-400 !cursor-not-allowed !backdrop-blur-sm"
+                      ? "bg-gradient-to-r from-barbershop-red to-red-600 text-white hover:from-barbershop-red/90 hover:to-red-600/90 hover:scale-[1.02] hover:shadow-barbershop-red/30"
+                      : "bg-gray-600/50 text-gray-400 cursor-not-allowed backdrop-blur-sm"
                   }
                 `}
               >
                 {isLoading ? (
-                  <div className="!flex !items-center !justify-center">
-                    <div className="!animate-spin !rounded-full !h-6 !w-6 !border-b-2 !border-white !mr-3"></div>
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3"></div>
                     <span>Iniciando sesión...</span>
                   </div>
                 ) : (
                   <>
-                    <span className="!relative !z-10">Iniciar Sesión</span>
+                    <span className="relative z-10">Iniciar Sesión</span>
                     {isFormValid && (
-                      <div className="!absolute !inset-0 !bg-white/10 !transform !-translate-x-full group-hover:!translate-x-0 !transition-transform !duration-500"></div>
+                      <div className="absolute inset-0 bg-white/10 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500"></div>
                     )}
                   </>
                 )}
               </button>
 
               {/* Forgot Password */}
-              <div className="!text-center !pt-2">
+              <div className="text-center pt-2">
                 <Link
                   href="/forgot-password"
-                  className="!text-sm !text-gray-400 hover:!text-white !transition-colors !duration-300 !relative group focus:!outline-none focus:!ring-2 focus:!ring-barbershop-red/50 !rounded-lg !p-2"
+                  className="text-sm text-gray-400 hover:text-white transition-colors duration-300 relative group focus:outline-none focus:ring-2 focus:ring-barbershop-red/50 rounded-lg p-2"
                 >
-                  <span className="!relative">
+                  <span className="relative">
                     ¿Olvidaste tu contraseña?
-                    <span className="!absolute !bottom-0 !left-0 !w-0 !h-0.5 !bg-barbershop-red group-hover:!w-full !transition-all !duration-300"></span>
+                    <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-barbershop-red group-hover:w-full transition-all duration-300"></span>
                   </span>
                 </Link>
               </div>
@@ -435,22 +434,22 @@ export default function LoginPage() {
           </div>
 
           {/* Register Link */}
-          <div className="!mt-10 !text-center">
-            <p className="!text-gray-400 !mb-6 !text-lg">¿Primera vez aquí?</p>
+          <div className="mt-10 text-center">
+            <p className="text-gray-400 mb-6 text-lg">¿Primera vez aquí?</p>
             <Link
               href="/register"
               className="
-                !inline-flex !items-center !px-8 !py-4
-                !bg-gradient-to-r !from-white/10 !to-white/5 !backdrop-blur-sm
-                !border-2 !border-barbershop-red/50 !text-white
-                !rounded-2xl !font-semibold !text-lg
-                hover:!bg-gradient-to-r hover:!from-barbershop-red/20 hover:!to-barbershop-red/10
-                hover:!border-barbershop-red hover:!shadow-lg hover:!shadow-barbershop-red/25
-                !transform hover:!scale-105 !transition-all !duration-500
-                group focus:!outline-none focus:!ring-2 focus:!ring-barbershop-red/50
+                inline-flex items-center px-8 py-4
+                bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-sm
+                border-2 border-barbershop-red/50 text-white
+                rounded-2xl font-semibold text-lg
+                hover:bg-gradient-to-r hover:from-barbershop-red/20 hover:to-barbershop-red/10
+                hover:border-barbershop-red hover:shadow-lg hover:shadow-barbershop-red/25
+                transform hover:scale-105 transition-all duration-500
+                group focus:outline-none focus:ring-2 focus:ring-barbershop-red/50
               "
             >
-              <Building className="!h-6 !w-6 !mr-3 group-hover:!scale-110 !transition-transform !duration-300" />
+              <Building className="h-6 w-6 mr-3 group-hover:scale-110 transition-transform duration-300" />
               <span>Registrar mi Barbería</span>
             </Link>
           </div>
@@ -459,5 +458,3 @@ export default function LoginPage() {
     </div>
   )
 }
-
-

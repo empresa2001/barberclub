@@ -4,8 +4,8 @@
 
 **BarberClub** es una PWA completa para la gestión de barberías que incluye:
 
-✅ **Schema SQL completo** - Base de datos PostgreSQL con RLS
-✅ **Políticas de seguridad** - Row Level Security por roles
+✅ **Schema MySQL completo** - Base de datos MySQL con relaciones y índices
+✅ **Backend Node.js** - API REST con autenticación JWT
 ✅ **Estructura Next.js** - App Router con TypeScript
 ✅ **Configuración PWA** - Manifest, Service Worker, offline
 ✅ **Diseño barbería** - Paleta de colores y tipografía profesional
@@ -15,31 +15,37 @@
 
 ## 🗄️ Archivos Creados
 
-### 1. Base de Datos (Supabase)
-- **`supabase/schema.sql`** - Esquema completo con 8 tablas, triggers, e índices
-- **`supabase/rls-policies.sql`** - Políticas de seguridad por rol de usuario
+### 1. Base de Datos (MySQL)
+- **`database/schema.sql`** - Esquema completo con 8 tablas, relaciones, e índices
+- Schema optimizado para MySQL con UUID como claves primarias
+- Vistas para consultas comunes y rendimiento mejorado
 
-### 2. Configuración PWA
+### 2. API Cliente
+- **`src/lib/api.ts`** - Cliente API para comunicación con backend Node.js
+- Métodos para autenticación, barberías, barberos, citas y servicios
+- Manejo de tokens JWT y tipos TypeScript
+
+### 3. Configuración PWA
 - **`public/manifest.json`** - Configuración de la aplicación web progresiva
 - **`public/sw.js`** - Service Worker para cacheo y funcionalidad offline
 - **`public/offline.html`** - Página personalizada sin conexión
 
-### 3. Configuración del Proyecto
+### 4. Configuración del Proyecto
 - **`next.config.ts`** - Configuración Next.js con headers de seguridad
 - **`tailwind.config.ts`** - Configuración personalizada con colores barbería
 - **`src/app/globals.css`** - Estilos globales y variables CSS
 - **`.env.local.example`** - Template de variables de entorno
 
-### 4. Estructura de Componentes
-- **`src/lib/supabase.ts`** - Cliente Supabase con tipos TypeScript
+### 5. Estructura de Componentes
+- **`src/lib/api.ts`** - Cliente API con autenticación JWT y tipos TypeScript
 - **`src/lib/utils.ts`** - Funciones utilitarias
 - **`src/components/ui/`** - Componentes UI base (Button, Input, Card, Modal, LoadingSpinner)
 
-### 5. Páginas
+### 6. Páginas
 - **`src/app/layout.tsx`** - Layout principal con metadatos PWA
 - **`src/app/page.tsx`** - Landing page con diseño barbería
 
-### 6. Documentación
+### 7. Documentación
 - **`README.md`** - Documentación completa del proyecto
 - **`.github/copilot-instructions.md`** - Instrucciones para GitHub Copilot
 - **`.vscode/tasks.json`** - Tareas de VS Code para desarrollo
@@ -98,7 +104,7 @@
 ## 🚀 Próximos Pasos
 
 ### Fase 1: Funcionalidades Core
-1. **Sistema de autenticación** - Login/registro con Supabase Auth
+1. **Sistema de autenticación** - Login/registro con JWT tokens
 2. **Gestión de barberías** - CRUD completo
 3. **Sistema de reservas** - Calendario y disponibilidad
 4. **Panel de administración** - Dashboard para barbershop_admin
@@ -163,8 +169,8 @@ npx tsc --noEmit
 
 - **Desarrollo**: http://localhost:3000
 - **Documentación**: Ver README.md
-- **Schema SQL**: supabase/schema.sql
-- **Políticas RLS**: supabase/rls-policies.sql
+- **Schema SQL**: database/schema.sql
+- **API Cliente**: src/lib/api.ts
 
 ---
 

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
 
@@ -12,7 +12,6 @@ export const metadata: Metadata = {
   title: "BarberClub - Gestión de Barberías",
   description: "Aplicación web para gestionar barberías y agendar turnos",
   manifest: "/manifest.json",
-  themeColor: "#b02e2e",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -30,6 +29,10 @@ export const metadata: Metadata = {
       { url: "/icons/icon-152x152.png", sizes: "152x152", type: "image/png" },
     ],
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#b02e2e",
 };
 
 export default function RootLayout({
