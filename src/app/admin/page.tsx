@@ -23,25 +23,33 @@ import {
   BarChart3,
   Activity,
   Star,
-  Zap
+  Zap,
+  Loader2
 } from 'lucide-react';
 import Logo from '@/components/Logo';
 import Link from 'next/link';
+import { barbershopsApi } from '@/lib/api';
+import { lookupService } from '@/lib/database';
+import { ConfirmModal } from '@/components/ui';
+import toast, { Toaster } from 'react-hot-toast';
 
-interface Barbershop {
+// Tipo específico para las barberías con sus relaciones
+interface BarbershopWithRelations {
   id: string;
   name: string;
-  email: string;
+  owner_id: string | null;
+  status_id: number;
+  description: string;
+  location: string;
   phone: string;
-  address: string;
-  status: 'active' | 'pending' | 'suspended';
-  admin_name: string;
-  admin_email: string;
+  image_url: string;
   created_at: string;
-  last_login?: string;
-  total_barbers: number;
-  total_appointments: number;
-  monthly_revenue: number;
+  updated_at: string;
+  barbershop_status: { name: string };
+  users: { name: string; email: string } | null;
+  total_barbers?: number;
+  total_appointments?: number;
+  monthly_revenue?: number;
 }
 
 interface DashboardStats {
@@ -49,8 +57,6 @@ interface DashboardStats {
   active_barbershops: number;
   pending_barbershops: number;
   total_users: number;
-  monthly_appointments: number;
-  monthly_revenue: number;
 }
 
 export default function AdminDashboard() {
@@ -59,96 +65,91 @@ export default function AdminDashboard() {
     active_barbershops: 0,
     pending_barbershops: 0,
     total_users: 0,
-    monthly_appointments: 0,
-    monthly_revenue: 0
   });
 
-  const [barbershops, setBarbershops] = useState<Barbershop[]>([]);
-  const [filteredBarbershops, setFilteredBarbershops] = useState<Barbershop[]>([]);
+  const [barbershops, setBarbershops] = useState<BarbershopWithRelations[]>([]);
+  const [filteredBarbershops, setFilteredBarbershops] = useState<BarbershopWithRelations[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'pending' | 'suspended'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'pending' | 'inactive'>('all');
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingStates, setLoadingStates] = useState<{[key: string]: boolean}>({});
+  
+  // Estado para el modal de confirmación
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    barbershopId: string;
+    barbershopName: string;
+    currentStatus: string;
+    newStatus: 'active' | 'inactive' | 'pending';
+    type: 'approve' | 'reject' | 'suspend' | 'reactivate';
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    barbershopId: '',
+    barbershopName: '',
+    currentStatus: '',
+    newStatus: 'active',
+    type: 'approve',
+    title: '',
+    message: '',
+  });
 
-  // Simulamos datos para la demo
+
+
+  // Cargar datos reales desde Supabase
   useEffect(() => {
     const loadData = async () => {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const mockStats: DashboardStats = {
-        total_barbershops: 42,
-        active_barbershops: 35,
-        pending_barbershops: 5,
-        total_users: 287,
-        monthly_appointments: 3542,
-        monthly_revenue: 125800
-      };
-
-      const mockBarbershops: Barbershop[] = [
-        {
-          id: '1',
-          name: 'Barbería Clásica Premium',
-          email: 'info@barberiaclasica.com',
-          phone: '+54 11 4567-8901',
-          address: 'Av. Corrientes 1234, CABA',
-          status: 'active',
-          admin_name: 'Carlos Martínez',
-          admin_email: 'carlos@barberiaclasica.com',
-          created_at: '2024-01-15',
-          last_login: '2024-01-20',
-          total_barbers: 6,
-          total_appointments: 234,
-          monthly_revenue: 18500
-        },
-        {
-          id: '2',
-          name: 'Modern Cut Studio',
-          email: 'contact@moderncut.com',
-          phone: '+54 11 5678-9012',
-          address: 'Palermo Hollywood 567, CABA',
-          status: 'active',
-          admin_name: 'Ana García',
-          admin_email: 'ana@moderncut.com',
-          created_at: '2024-01-10',
-          last_login: '2024-01-19',
-          total_barbers: 8,
-          total_appointments: 389,
-          monthly_revenue: 24200
-        },
-        {
-          id: '3',
-          name: 'Barber Shop Elite',
-          email: 'admin@barbershopelite.com',
-          phone: '+54 11 6789-0123',
-          address: 'Belgrano R 890, CABA',
-          status: 'pending',
-          admin_name: 'Miguel Rodríguez',
-          admin_email: 'miguel@barbershopelite.com',
-          created_at: '2024-01-18',
-          total_barbers: 0,
-          total_appointments: 0,
-          monthly_revenue: 0
-        },
-        {
-          id: '4',
-          name: 'Style & Cuts',
-          email: 'info@stylecuts.com',
-          phone: '+54 11 7890-1234',
-          address: 'Villa Crespo 456, CABA',
-          status: 'active',
-          admin_name: 'Laura Fernández',
-          admin_email: 'laura@stylecuts.com',
-          created_at: '2024-01-05',
-          last_login: '2024-01-20',
-          total_barbers: 4,
-          total_appointments: 156,
-          monthly_revenue: 12800
+      try {
+        setIsLoading(true);
+        console.log('🔍 Iniciando carga de datos desde Supabase...');
+        
+        // Verificar estados disponibles primero
+        try {
+          const availableStatuses = await lookupService.getBarbershopStatuses();
+          console.log('📊 Estados disponibles en el sistema:', availableStatuses);
+        } catch (statusError) {
+          console.error('⚠️ Error verificando estados:', statusError);
         }
-      ];
+        
+        // Obtener todas las barberías con sus relaciones
+        const barbershopsData = await barbershopsApi.getAll() as any; // Cast temporal para evitar errores de tipos
+        console.log('📊 Datos recibidos de Supabase:', barbershopsData);
+        
+        // Procesar los datos para el estado local
+        const processedBarbershops: BarbershopWithRelations[] = barbershopsData.map((barbershop: any) => ({
+          ...barbershop,
+          // Asegurar que las relaciones estén presentes
+          barbershop_status: barbershop.barbershop_status || { name: 'pending' },
+          users: null, // Temporalmente sin relación users
+          total_barbers: 0, // TODO: Implementar conteo real de barberos
+          total_appointments: 0, // TODO: Implementar conteo real de citas
+          monthly_revenue: 0, // TODO: Implementar cálculo real de ingresos
+        }));
 
-      setStats(mockStats);
-      setBarbershops(mockBarbershops);
-      setFilteredBarbershops(mockBarbershops);
-      setIsLoading(false);
+        console.log('✅ Barberías procesadas:', processedBarbershops);
+        setBarbershops(processedBarbershops);
+        setFilteredBarbershops(processedBarbershops);
+
+        // Calcular estadísticas
+        const totalBarbershops = processedBarbershops.length;
+        const activeBarbershops = processedBarbershops.filter(b => b.barbershop_status.name === 'active').length;
+        const pendingBarbershops = processedBarbershops.filter(b => b.barbershop_status.name === 'pending').length;
+
+        setStats({
+          total_barbershops: totalBarbershops,
+          active_barbershops: activeBarbershops,
+          pending_barbershops: pendingBarbershops,
+          total_users: totalBarbershops, // Aproximación: 1 usuario admin por barbería
+        });
+
+      } catch (error) {
+        console.error('❌ Error cargando datos desde Supabase:', error);
+        // En caso de error, mostrar mensaje amigable al usuario
+        setIsLoading(false);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     loadData();
@@ -161,26 +162,148 @@ export default function AdminDashboard() {
     if (searchTerm) {
       filtered = filtered.filter(barbershop =>
         barbershop.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        barbershop.admin_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        barbershop.address.toLowerCase().includes(searchTerm.toLowerCase())
+        (barbershop.users?.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        barbershop.location.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(barbershop => barbershop.status === statusFilter);
+      filtered = filtered.filter(barbershop => barbershop.barbershop_status.name === statusFilter);
     }
 
     setFilteredBarbershops(filtered);
   }, [barbershops, searchTerm, statusFilter]);
 
-  const handleStatusChange = async (barbershopId: string, newStatus: 'active' | 'suspended') => {
-    setBarbershops(prev => 
-      prev.map(barbershop => 
-        barbershop.id === barbershopId 
-          ? { ...barbershop, status: newStatus }
-          : barbershop
-      )
-    );
+  const handleStatusChange = async (barbershopId: string, currentStatus: string, newStatus: 'active' | 'inactive' | 'pending') => {
+    const barbershop = barbershops.find(b => b.id === barbershopId);
+    if (!barbershop) return;
+
+    // Configurar el modal según el tipo de cambio
+    let modalConfig: {
+      type: 'approve' | 'reject' | 'suspend' | 'reactivate';
+      title: string;
+      message: string;
+    };
+
+    if (currentStatus === 'pending' && newStatus === 'active') {
+      modalConfig = {
+        type: 'approve',
+        title: 'Aprobar Barbería',
+        message: 'Esta barbería podrá funcionar normalmente y los clientes podrán hacer reservas.',
+      };
+    } else if (currentStatus === 'pending' && newStatus === 'inactive') {
+      modalConfig = {
+        type: 'reject',
+        title: 'Rechazar Barbería',
+        message: 'Esta barbería no podrá funcionar hasta ser aprobada nuevamente.',
+      };
+    } else if (currentStatus === 'active' && newStatus === 'inactive') {
+      modalConfig = {
+        type: 'suspend',
+        title: 'Suspender Barbería',
+        message: 'Los clientes no podrán hacer reservas hasta que sea reactivada.',
+      };
+    } else if (currentStatus === 'inactive' && newStatus === 'active') {
+      modalConfig = {
+        type: 'reactivate',
+        title: 'Reactivar Barbería',
+        message: 'La barbería volverá a estar disponible para reservas.',
+      };
+    } else {
+      modalConfig = {
+        type: 'approve',
+        title: 'Cambiar Estado',
+        message: `¿Estás seguro de que deseas cambiar el estado de esta barbería?`,
+      };
+    }
+
+    // Abrir modal de confirmación
+    setConfirmModal({
+      isOpen: true,
+      barbershopId,
+      barbershopName: barbershop.name,
+      currentStatus,
+      newStatus,
+      ...modalConfig,
+    });
+  };
+
+  const handleConfirmStatusChange = async () => {
+    const { barbershopId, newStatus } = confirmModal;
+    
+    try {
+      // Marcar como loading y cerrar modal
+      setLoadingStates(prev => ({ ...prev, [barbershopId]: true }));
+      setConfirmModal(prev => ({ ...prev, isOpen: false }));
+
+      console.log(`🔄 Cambiando estado a ${newStatus} para barbería ${barbershopId}`);
+      await barbershopsApi.updateStatus(barbershopId, newStatus);
+      
+      // Actualizar el estado local
+      setBarbershops(prev => {
+        const updated = prev.map(barbershop => 
+          barbershop.id === barbershopId 
+            ? { ...barbershop, barbershop_status: { name: newStatus } }
+            : barbershop
+        );
+        
+        // Recalcular estadísticas
+        const totalBarbershops = updated.length;
+        const activeBarbershops = updated.filter(b => b.barbershop_status.name === 'active').length;
+        const pendingBarbershops = updated.filter(b => b.barbershop_status.name === 'pending').length;
+
+        setStats({
+          total_barbershops: totalBarbershops,
+          active_barbershops: activeBarbershops,
+          pending_barbershops: pendingBarbershops,
+          total_users: totalBarbershops,
+        });
+        
+        return updated;
+      });
+
+      console.log(`✅ Estado actualizado exitosamente a ${newStatus}`);
+      
+      // Mostrar toast de éxito
+      const statusMessages = {
+        active: 'activada',
+        inactive: 'desactivada',
+        pending: 'marcada como pendiente'
+      };
+      
+      toast.success(`Barbería ${statusMessages[newStatus]} exitosamente`, {
+        duration: 4000,
+        icon: '✅',
+        style: {
+          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+          color: 'white',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 10px 25px rgba(16, 185, 129, 0.3)',
+        },
+      });
+
+    } catch (error) {
+      console.error('❌ Error actualizando estado:', error);
+      
+      // Mostrar toast de error
+      toast.error(`Error al actualizar el estado: ${error instanceof Error ? error.message : 'Error desconocido'}`, {
+        duration: 6000,
+        icon: '❌',
+        style: {
+          background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+          color: 'white',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 10px 25px rgba(239, 68, 68, 0.3)',
+        },
+      });
+    } finally {
+      // Quitar loading
+      setLoadingStates(prev => ({ ...prev, [barbershopId]: false }));
+    }
+  };
+
+  const handleCancelStatusChange = () => {
+    setConfirmModal(prev => ({ ...prev, isOpen: false }));
   };
 
   const getStatusBadge = (status: string) => {
@@ -195,9 +318,9 @@ export default function AdminDashboard() {
         label: 'Pendiente',
         icon: Clock
       },
-      suspended: { 
+      inactive: { 
         color: 'bg-red-500/20 text-red-400 border-red-500/30', 
-        label: 'Suspendida',
+        label: 'Inactiva',
         icon: XCircle
       }
     };
@@ -220,7 +343,7 @@ export default function AdminDashboard() {
       icon: Building2,
       color: 'text-barbershop-blue',
       bgColor: 'bg-barbershop-blue/10',
-      change: '+12%',
+      change: `${stats.total_barbershops > 0 ? '+' : ''}${stats.total_barbershops}`,
       changeType: 'positive'
     },
     {
@@ -229,8 +352,17 @@ export default function AdminDashboard() {
       icon: CheckCircle,
       color: 'text-green-400',
       bgColor: 'bg-green-500/10',
-      change: '+8%',
+      change: `${stats.active_barbershops}/${stats.total_barbershops}`,
       changeType: 'positive'
+    },
+    {
+      title: 'Pendientes de Aprobación',
+      value: stats.pending_barbershops,
+      icon: Clock,
+      color: 'text-yellow-400',
+      bgColor: 'bg-yellow-500/10',
+      change: stats.pending_barbershops > 0 ? 'Requieren atención' : 'Todo al día',
+      changeType: stats.pending_barbershops > 0 ? 'neutral' : 'positive'
     },
     {
       title: 'Usuarios Totales',
@@ -238,17 +370,8 @@ export default function AdminDashboard() {
       icon: Users,
       color: 'text-barbershop-red',
       bgColor: 'bg-barbershop-red/10',
-      change: '+23%',
-      changeType: 'positive'
-    },
-    {
-      title: 'Ingresos Mensuales',
-      value: `$${stats.monthly_revenue.toLocaleString()}`,
-      icon: TrendingUp,
-      color: 'text-green-400',
-      bgColor: 'bg-green-500/10',
-      change: '+15%',
-      changeType: 'positive'
+      change: 'Administradores',
+      changeType: 'neutral'
     }
   ];
 
@@ -470,11 +593,11 @@ export default function AdminDashboard() {
                           </div>
                           <div className="text-sm text-white/60 flex items-center mt-1">
                             <MapPin className="h-3 w-3 mr-1" />
-                            {barbershop.address}
+                            {barbershop.location}
                           </div>
                           <div className="text-sm text-white/60 flex items-center mt-1">
                             <Phone className="h-3 w-3 mr-1" />
-                            {barbershop.phone}
+                            {barbershop.phone || 'No especificado'}
                           </div>
                         </div>
                       </div>
@@ -482,40 +605,38 @@ export default function AdminDashboard() {
                     <td className="px-8 py-6">
                       <div>
                         <div className="text-sm font-medium text-white">
-                          {barbershop.admin_name}
+                          {barbershop.users?.name || 'Sin asignar'}
                         </div>
                         <div className="text-sm text-white/60 flex items-center mt-1">
                           <Mail className="h-3 w-3 mr-1" />
-                          {barbershop.admin_email}
+                          {barbershop.users?.email || 'No especificado'}
                         </div>
-                        {barbershop.last_login && (
-                          <div className="text-xs text-white/50 flex items-center mt-1">
-                            <Clock className="h-3 w-3 mr-1" />
-                            Último acceso: {new Date(barbershop.last_login).toLocaleDateString()}
-                          </div>
-                        )}
+                        <div className="text-xs text-white/50 flex items-center mt-1">
+                          <Clock className="h-3 w-3 mr-1" />
+                          Creado: {new Date(barbershop.created_at).toLocaleDateString()}
+                        </div>
                       </div>
                     </td>
                     <td className="px-8 py-6">
-                      {getStatusBadge(barbershop.status)}
+                      {getStatusBadge(barbershop.barbershop_status.name)}
                     </td>
                     <td className="px-8 py-6">
                       <div className="grid grid-cols-3 gap-4">
                         <div className="text-center p-3 bg-white/5 rounded-xl group-hover:bg-white/10 transition-colors duration-300 border border-white/10">
                           <div className="text-sm font-semibold text-white">
-                            {barbershop.total_barbers}
+                            {barbershop.total_barbers || 0}
                           </div>
                           <div className="text-xs text-white/60">Barberos</div>
                         </div>
                         <div className="text-center p-3 bg-white/5 rounded-xl group-hover:bg-white/10 transition-colors duration-300 border border-white/10">
                           <div className="text-sm font-semibold text-white">
-                            {barbershop.total_appointments}
+                            {barbershop.total_appointments || 0}
                           </div>
                           <div className="text-xs text-white/60">Turnos</div>
                         </div>
                         <div className="text-center p-3 bg-white/5 rounded-xl group-hover:bg-white/10 transition-colors duration-300 border border-white/10">
                           <div className="text-sm font-semibold text-green-400">
-                            ${barbershop.monthly_revenue.toLocaleString()}
+                            ${(barbershop.monthly_revenue || 0).toLocaleString()}
                           </div>
                           <div className="text-xs text-white/60">Mensual</div>
                         </div>
@@ -529,20 +650,60 @@ export default function AdminDashboard() {
                         <button className="p-2 text-white/60 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all duration-300 group/btn">
                           <Edit className="h-4 w-4 group-hover/btn:scale-110 transition-transform duration-300" />
                         </button>
-                        {barbershop.status === 'pending' && (
+                        {barbershop.barbershop_status.name === 'pending' && (
+                          <>
+                            <button 
+                              onClick={() => handleStatusChange(barbershop.id, barbershop.barbershop_status.name, 'active')}
+                              disabled={loadingStates[barbershop.id]}
+                              className="p-2 text-white/60 hover:text-green-400 hover:bg-green-400/10 rounded-lg transition-all duration-300 group/btn disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Aprobar barbería"
+                            >
+                              {loadingStates[barbershop.id] ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <CheckCircle className="h-4 w-4 group-hover/btn:scale-110 transition-transform duration-300" />
+                              )}
+                            </button>
+                            <button 
+                              onClick={() => handleStatusChange(barbershop.id, barbershop.barbershop_status.name, 'inactive')}
+                              disabled={loadingStates[barbershop.id]}
+                              className="p-2 text-white/60 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all duration-300 group/btn disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Rechazar barbería"
+                            >
+                              {loadingStates[barbershop.id] ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <XCircle className="h-4 w-4 group-hover/btn:scale-110 transition-transform duration-300" />
+                              )}
+                            </button>
+                          </>
+                        )}
+                        {barbershop.barbershop_status.name === 'active' && (
                           <button 
-                            onClick={() => handleStatusChange(barbershop.id, 'active')}
-                            className="p-2 text-white/60 hover:text-green-400 hover:bg-green-400/10 rounded-lg transition-all duration-300 group/btn"
+                            onClick={() => handleStatusChange(barbershop.id, barbershop.barbershop_status.name, 'inactive')}
+                            disabled={loadingStates[barbershop.id]}
+                            className="p-2 text-white/60 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all duration-300 group/btn disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Desactivar barbería"
                           >
-                            <CheckCircle className="h-4 w-4 group-hover/btn:scale-110 transition-transform duration-300" />
+                            {loadingStates[barbershop.id] ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <XCircle className="h-4 w-4 group-hover/btn:scale-110 transition-transform duration-300" />
+                            )}
                           </button>
                         )}
-                        {barbershop.status === 'active' && (
+                        {barbershop.barbershop_status.name === 'inactive' && (
                           <button 
-                            onClick={() => handleStatusChange(barbershop.id, 'suspended')}
-                            className="p-2 text-white/60 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all duration-300 group/btn"
+                            onClick={() => handleStatusChange(barbershop.id, barbershop.barbershop_status.name, 'active')}
+                            disabled={loadingStates[barbershop.id]}
+                            className="p-2 text-white/60 hover:text-green-400 hover:bg-green-400/10 rounded-lg transition-all duration-300 group/btn disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Reactivar barbería"
                           >
-                            <XCircle className="h-4 w-4 group-hover/btn:scale-110 transition-transform duration-300" />
+                            {loadingStates[barbershop.id] ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <CheckCircle className="h-4 w-4 group-hover/btn:scale-110 transition-transform duration-300" />
+                            )}
                           </button>
                         )}
                         <button className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-300 group/btn">
@@ -581,6 +742,48 @@ export default function AdminDashboard() {
           )}
         </div>
       </div>
+
+      {/* Modal de confirmación */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={handleCancelStatusChange}
+        onConfirm={handleConfirmStatusChange}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+        barbershopName={confirmModal.barbershopName}
+        isLoading={loadingStates[confirmModal.barbershopId] || false}
+      />
+
+      {/* Toast notifications */}
+      <Toaster
+        position="top-right"
+        reverseOrder={false}
+        gutter={8}
+        containerClassName=""
+        containerStyle={{}}
+        toastOptions={{
+          className: '',
+          duration: 4000,
+          style: {
+            borderRadius: '12px',
+            fontWeight: '500',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+          },
+          success: {
+            iconTheme: {
+              primary: '#10b981',
+              secondary: '#ffffff',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#ffffff',
+            },
+          },
+        }}
+      />
     </div>
   );
 }

@@ -214,11 +214,22 @@ export const barbershopsApi = {
   update: (id: string, data: Partial<BarbershopInsert>) => barbershopService.update(id, data),
   delete: (id: string) => barbershopService.delete(id),
   updateStatus: async (id: string, statusName: 'active' | 'pending' | 'inactive') => {
+    console.log('🔄 Actualizando estado:', { id, statusName });
+    
     // Get status ID from name
     const statuses = await lookupService.getBarbershopStatuses()
-    const status = statuses.find(s => s.name === statusName)
-    if (!status) throw new Error('Invalid status')
+    console.log('📋 Estados disponibles:', statuses);
     
+    const status = statuses.find(s => s.name === statusName)
+    console.log('🎯 Estado encontrado:', status);
+    
+    if (!status) {
+      console.error('❌ Estado no encontrado:', statusName);
+      console.error('📋 Estados disponibles:', statuses.map(s => s.name));
+      throw new Error(`Invalid status: ${statusName}. Available: ${statuses.map(s => s.name).join(', ')}`)
+    }
+    
+    console.log('💾 Actualizando barbería con status_id:', status.id);
     return barbershopService.update(id, { status_id: status.id })
   },
 };

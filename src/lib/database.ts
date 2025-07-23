@@ -42,17 +42,46 @@ export const authService = {
 export const barbershopService = {
   // Get all barbershops
   async getAll(): Promise<Barbershop[]> {
+    // Primero probamos una consulta muy simple
+    console.log('🔍 Probando consulta simple a barbershops...');
+    
+    const { data: simpleData, error: simpleError } = await supabase
+      .from('barbershops')
+      .select('*')
+      .limit(10);
+    
+    if (simpleError) {
+      console.error('❌ Error en consulta simple:', simpleError);
+    } else {
+      console.log('📊 Registros encontrados (consulta simple):', simpleData?.length || 0);
+      console.log('📋 Datos simples:', simpleData);
+    }
+    
+    // Obtener datos sin relación externa y mapear manualmente
     const { data, error } = await supabase
       .from('barbershops')
-      .select(`
-        *,
-        barbershop_status(name),
-        users(name, email)
-      `)
+      .select('*')
       .order('created_at', { ascending: false })
     
-    if (error) throw error
-    return data || []
+    if (error) {
+      console.error('❌ Error en consulta barbershops:', error);
+      throw error;
+    }
+    
+    console.log('📋 Datos raw de barbershops:', data);
+    
+    // Mapear los status_id a nombres manualmente ya que la tabla barbershop_status puede estar vacía
+    const mappedData = data?.map(barbershop => ({
+      ...barbershop,
+      barbershop_status: { 
+        name: barbershop.status_id === 1 ? 'pending' : 
+              barbershop.status_id === 2 ? 'active' : 
+              barbershop.status_id === 3 ? 'inactive' : 'pending'
+      }
+    })) || []
+    
+    console.log('📋 Datos mapeados de barbershops:', mappedData);
+    return mappedData || []
   },
 
   // Get barbershop by ID
@@ -61,13 +90,25 @@ export const barbershopService = {
       .from('barbershops')
       .select(`
         *,
-        barbershop_status(name),
         users(name, email)
       `)
       .eq('id', id)
       .single()
     
     if (error && error.code !== 'PGRST116') throw error
+    
+    // Mapear el status manualmente si encontramos data
+    if (data) {
+      return {
+        ...data,
+        barbershop_status: { 
+          name: data.status_id === 1 ? 'pending' : 
+                data.status_id === 2 ? 'active' : 
+                data.status_id === 3 ? 'inactive' : 'pending'
+        }
+      } as Barbershop
+    }
+    
     return data
   },
 
@@ -373,13 +414,83 @@ export const lookupService = {
 
   // Get barbershop statuses
   async getBarbershopStatuses() {
+    console.log('🔍 Obteniendo estados de barbería...');
     const { data, error } = await supabase
       .from('barbershop_status')
       .select('*')
       .order('id')
     
-    if (error) throw error
+    if (error) {
+      console.error('❌ Error obteniendo estados:', error);
+      throw error;
+    }
+    
+    console.log('✅ Estados obtenidos:', data);
+    
+    // Si no hay datos, intentar usar datos por defecto sin crear en la DB
+    if (!data || data.length === 0) {
+      console.log('⚠️ No hay estados en la DB, usando valores por defecto');
+      // Retornar valores por defecto hardcodeados
+      return [
+        { id: 1, name: 'pending' },
+        { id: 2, name: 'active' },
+        { id: 3, name: 'inactive' }
+      ];
+    }
+    
+    // Verificar que existan los estados necesarios
+    const requiredStatuses = ['pending', 'active', 'inactive'];
+    const existingStatuses = data.map(s => s.name);
+    const missingStatuses = requiredStatuses.filter(status => !existingStatuses.includes(status));
+    
+    if (missingStatuses.length > 0) {
+      console.log('⚠️ Estados faltantes:', missingStatuses, 'usando valores por defecto');
+      // En lugar de intentar crear, usar valores por defecto
+      const defaultStatuses = [
+        { id: 1, name: 'pending' },
+        { id: 2, name: 'active' },
+        { id: 3, name: 'inactive' }
+      ];
+      return defaultStatuses;
+    }
+    
     return data || []
+  },
+
+  // Inicializar estados de barbería por defecto
+  async initializeBarbershopStatuses() {
+    const defaultStatuses = [
+      { name: 'pending' },
+      { name: 'active' },
+      { name: 'inactive' }
+    ];
+
+    const { error } = await supabase
+      .from('barbershop_status')
+      .insert(defaultStatuses);
+
+    if (error) {
+      console.error('❌ Error inicializando estados:', error);
+      throw error;
+    }
+
+    console.log('✅ Estados por defecto creados');
+  },
+
+  // Crear estados faltantes
+  async createMissingStatuses(missingStatuses: string[]) {
+    const statusesToCreate = missingStatuses.map(name => ({ name }));
+
+    const { error } = await supabase
+      .from('barbershop_status')
+      .insert(statusesToCreate);
+
+    if (error) {
+      console.error('❌ Error creando estados faltantes:', error);
+      throw error;
+    }
+
+    console.log('✅ Estados faltantes creados:', missingStatuses);
   },
 
   // Get appointment statuses
