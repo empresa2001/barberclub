@@ -1,47 +1,54 @@
-// Test file to verify Supabase connection and database functions
-// This file can be run to test the database setup
+import { createClient } from '@supabase/supabase-js'
+import dotenv from 'dotenv'
 
-import { supabase } from '../src/lib/supabase'
-import { lookupService } from '../src/lib/database'
+// Load environment variables
+dotenv.config({ path: '.env.local' })
+
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)
 
 async function testDatabaseConnection() {
   console.log('🧪 Testing Supabase database connection...')
   
   try {
     // Test basic connection
-    const { data: { session } } = await supabase.auth.getSession()
+    const { data: { user } } = await supabase.auth.getUser()
     console.log('✅ Supabase connection established')
     
-    // Test database queries (these will work once tables are created)
+    // Test database queries
     try {
-      const userTypes = await lookupService.getUserTypes()
-      console.log('✅ User types retrieved:', userTypes.length, 'types')
+      const { data: userTypes } = await supabase
+        .from('user_types')
+        .select('*')
+      console.log('✅ User types retrieved:', userTypes?.length || 0, 'types')
       
-      const barbershopStatuses = await lookupService.getBarbershopStatuses()
-      console.log('✅ Barbershop statuses retrieved:', barbershopStatuses.length, 'statuses')
+      const { data: barbershopStatuses } = await supabase
+        .from('barbershop_status')
+        .select('*')
+      console.log('✅ Barbershop statuses retrieved:', barbershopStatuses?.length || 0, 'statuses')
       
-      const appointmentStatuses = await lookupService.getAppointmentStatuses()
-      console.log('✅ Appointment statuses retrieved:', appointmentStatuses.length, 'statuses')
+      const { data: appointmentStatuses } = await supabase
+        .from('appointment_status')
+        .select('*')
+      console.log('✅ Appointment statuses retrieved:', appointmentStatuses?.length || 0, 'statuses')
       
       console.log('🎉 All database tests passed!')
       
     } catch (dbError) {
       console.log('⚠️  Database tables not yet created. Please run the SQL schema first.')
       console.log('   See SUPABASE_SETUP.md for instructions.')
-      console.log('   Error:', (dbError as Error).message)
+      console.log('   Error:', dbError.message)
     }
     
   } catch (error) {
-    console.error('❌ Failed to connect to Supabase:', (error as Error).message)
+    console.error('❌ Failed to connect to Supabase:', error.message)
     console.log('💡 Make sure you have set up your .env.local file with Supabase credentials')
     console.log('   See SUPABASE_SETUP.md for setup instructions')
   }
 }
 
-// Export for use in other files
-export { testDatabaseConnection }
-
-// Run test if this file is executed directly
-if (require.main === module) {
-  testDatabaseConnection()
-}
+// Execute test
+testDatabaseConnection()

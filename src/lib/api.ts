@@ -1,7 +1,7 @@
 // API Configuration using Supabase
 import { supabase } from './supabase'
 import { 
-  userService, 
+  // userService, 
   barbershopService, 
   barberService, 
   serviceService, 
@@ -47,37 +47,135 @@ export const authApi = {
   },
   
   // Sign up with email and password
-  signUp: async (userData: { 
-    email: string; 
-    password: string; 
-    name: string;
-    user_type_id: number;
-    barbershop_id?: string;
-  }) => {
-    // First create the auth user
+signUp: async (userData: { 
+  email: string; 
+  password: string; 
+  name: string;
+  barbershopName: string;
+  barbershopAddress: string;
+  barbershopPhone: string;
+  barbershopEmail?: string;
+}) => {
+  try {
+    console.log('🚀 Iniciando registro...');
+
+    // 1. Crear usuario en auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: userData.email,
       password: userData.password,
-    })
+      options: {
+        data: {
+          name: userData.name,
+          role: 'owner'
+        },
+        emailRedirectTo: `${window.location.origin}/auth/callback`
+      }
+    });
     
-    if (authError) throw authError
-    
-    // Then create the user record in our users table
-    if (authData.user) {
-      const userRecord = await userService.create({
-        id: authData.user.id,
-        email: userData.email,
-        password: userData.password, // In real app, this should be handled securely
-        name: userData.name,
-        user_type_id: userData.user_type_id,
-        barber_id: userData.barbershop_id || null
-      })
+    if (authError) throw authError;
+    if (!authData.user) throw new Error('No se pudo crear el usuario');
+
+    console.log('✅ Usuario creado en auth', authData.user.id);
+
+    // 2. Verificar que el usuario existe en public.users (con reintentos)
+    let userExists = false;
+    let retries = 0;
+    const maxRetries = 5;
+
+    while (!userExists && retries < maxRetries) {
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Esperar 1 segundo
       
-      return { user: authData.user, userRecord }
+      const { data: existingUser, error: checkError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', authData.user.id)
+        .single();
+
+      if (!checkError && existingUser) {
+        userExists = true;
+        console.log('✅ Usuario encontrado en public.users');
+      } else {
+        retries++;
+        console.log(`⏳ Esperando que se cree el usuario... intento ${retries}/${maxRetries}`);
+      }
     }
-    
-    return authData
-  },
+
+    // 3. Si el trigger falló, crear manualmente
+    if (!userExists) {
+      console.log('⚠️ Trigger falló, creando usuario manualmente...');
+      const { error: manualUserError } = await supabase
+        .from('users')
+        .insert({
+          id: authData.user.id,
+          email: userData.email,
+          name: userData.name,
+          user_type_id: 2
+        });
+
+      if (manualUserError) {
+        console.error('Error creando usuario manualmente:', manualUserError);
+        throw manualUserError;
+      }
+      console.log('✅ Usuario creado manualmente');
+    }
+
+    // 4. Crear la barbería
+    const { data: barbershop, error: barbershopError } = await supabase
+      .from('barbershops')
+      .insert({
+        name: userData.barbershopName,
+        description: 'Nueva barbería',
+        location: userData.barbershopAddress,
+        phone: userData.barbershopPhone,
+        email: userData.barbershopEmail || null,
+        owner_id: authData.user.id,
+        status_id: 1
+      })
+      .select()
+      .single();
+
+    if (barbershopError) throw barbershopError;
+    console.log('✅ Barbería creada');
+
+    // 5. Crear el barbero (ahora debería funcionar)
+    const { data: barber, error: barberError } = await supabase
+      .from('barbers')
+      .insert({
+        user_id: authData.user.id,
+        barbershop_id: barbershop.id
+      })
+      .select()
+      .single();
+
+    if (barberError) {
+      console.error('Error detallado del barbero:', barberError);
+      throw barberError;
+    }
+    console.log('✅ Barbero creado');
+
+    // 6. Actualizar el usuario con el barber_id
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ barber_id: barber.id })
+      .eq('id', authData.user.id);
+
+    if (updateError) {
+      console.error('Error actualizando usuario:', updateError);
+    } else {
+      console.log('✅ Usuario actualizado con barber_id');
+    }
+
+    return {
+      user: authData.user,
+      barbershop,
+      barber
+    };
+
+  } catch (error) {
+    console.error('❌ Error en signUp:', error);
+    throw error;
+  }
+},
   
   // Sign out
   signOut: async () => {
@@ -204,13 +302,11 @@ export const lookupsApi = {
 
 // Re-export types from database.types for backward compatibility
 export type {
-  User,
   Barbershop,
   Barber,
   Service,
   Appointment,
   Schedule,
-  UserInsert,
   BarbershopInsert,
   BarberInsert,
   ServiceInsert,

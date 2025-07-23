@@ -1,12 +1,10 @@
 import { supabase } from './supabase'
-import { 
-  User, 
+import type { 
   Barbershop, 
   Barber, 
   Service, 
   Appointment,
   Schedule,
-  UserInsert,
   BarbershopInsert,
   BarberInsert,
   ServiceInsert,
@@ -14,53 +12,29 @@ import {
   ScheduleInsert
 } from './database.types'
 
-// User operations
-export const userService = {
-  // Get user by ID
-  async getById(id: string): Promise<User | null> {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', id)
-      .single()
-    
+// Auth operations
+export const authService = {
+  // Get user profile by ID
+  async getProfile(userId: string) {
+    const { data: { user }, error } = await supabase.auth.admin.getUserById(userId)
     if (error) throw error
-    return data
+    return user
   },
 
-  // Get user by email
-  async getByEmail(email: string): Promise<User | null> {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .single()
-    
-    if (error && error.code !== 'PGRST116') throw error
-    return data
+  // Get current user profile
+  async getCurrentProfile() {
+    const { data: { user }, error } = await supabase.auth.getUser()
+    if (error) throw error
+    return user
   },
 
-  // Create user
-  async create(userData: UserInsert): Promise<User> {
-    const { data, error } = await supabase
-      .from('users')
-      .insert(userData)
-      .select()
-      .single()
-    
+  // Update user profile
+  async updateProfile(updates: { name?: string; email?: string; phone?: string }) {
+    const { data: { user }, error } = await supabase.auth.updateUser({
+      data: updates
+    })
     if (error) throw error
-    return data
-  },
-
-  // Get all users (admin only)
-  async getAll(): Promise<User[]> {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .order('created_at', { ascending: false })
-    
-    if (error) throw error
-    return data || []
+    return user
   }
 }
 
@@ -141,7 +115,6 @@ export const barberService = {
       .from('barbers')
       .select(`
         *,
-        users(name, email),
         barbershops(name)
       `)
       .eq('barbershop_id', barbershopId)
@@ -157,7 +130,6 @@ export const barberService = {
       .from('barbers')
       .select(`
         *,
-        users(name, email),
         barbershops(name)
       `)
       .eq('user_id', userId)

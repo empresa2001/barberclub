@@ -1,9 +1,26 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Eye, EyeOff, ArrowLeft, Building, User, Phone, MapPin, CheckCircle, Sparkles, Shield, Zap } from 'lucide-react';
-import Link from 'next/link';
-import Logo from '@/components/Logo';
+import { useState } from "react";
+import {
+  Eye,
+  EyeOff,
+  ArrowLeft,
+  Building,
+  User,
+  Phone,
+  MapPin,
+  CheckCircle,
+  Sparkles,
+  Shield,
+  Zap,
+} from "lucide-react";
+import Link from "next/link";
+import Logo from "@/components/Logo";
+import { authApi, barbershopsApi, barbersApi } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 
 interface FormData {
   // Barbershop Info
@@ -11,94 +28,121 @@ interface FormData {
   barbershopAddress: string;
   barbershopPhone: string;
   barbershopEmail: string;
-  
+
   // Admin User Info
   adminName: string;
   adminEmail: string;
   adminPassword: string;
   confirmPassword: string;
-  
+
   // Terms
   acceptTerms: boolean;
   acceptPrivacy: boolean;
 }
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const [formData, setFormData] = useState<FormData>({
-    barbershopName: '',
-    barbershopAddress: '',
-    barbershopPhone: '',
-    barbershopEmail: '',
-    adminName: '',
-    adminEmail: '',
-    adminPassword: '',
-    confirmPassword: '',
+    barbershopName: "",
+    barbershopAddress: "",
+    barbershopPhone: "",
+    barbershopEmail: "",
+    adminName: "",
+    adminEmail: "",
+    adminPassword: "",
+    confirmPassword: "",
     acceptTerms: false,
     acceptPrivacy: false,
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === "checkbox" ? checked : value,
     }));
   };
 
   const handleNextStep = () => {
-    setCurrentStep(prev => Math.min(prev + 1, 3));
+    setCurrentStep((prev) => Math.min(prev + 1, 3));
   };
 
   const handlePrevStep = () => {
-    setCurrentStep(prev => Math.max(prev - 1, 1));
+    setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    
-    // Simulamos registro
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    console.log('Registration attempt:', formData);
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setIsLoading(true);
+  console.log('Iniciando registro...');
+
+  try {
+    // Usar authApi en lugar de llamadas directas a supabase
+    const result = await authApi.signUp({
+      email: formData.adminEmail,
+      password: formData.adminPassword,
+      name: formData.adminName,
+      barbershopName: formData.barbershopName,
+      barbershopAddress: formData.barbershopAddress,
+      barbershopPhone: formData.barbershopPhone,
+      barbershopEmail: formData.barbershopEmail
+    });
+
+    console.log('Registro completado:', result);
+    toast.success("¡Registro exitoso! Por favor verifica tu email para continuar.");
+    router.push("/auth/verify-email");
+
+  } catch (error: any) {
+    console.error("Error en el registro:", error);
+    toast.error(error.message || "Error al completar el registro");
+  } finally {
     setIsLoading(false);
-  };
+  }
+};
 
-  const isStep1Valid = formData.barbershopName && formData.barbershopAddress && formData.barbershopPhone;
-  const isStep2Valid = formData.adminName && formData.adminEmail && formData.adminPassword && formData.confirmPassword && formData.adminPassword === formData.confirmPassword;
+  const isStep1Valid =
+    formData.barbershopName &&
+    formData.barbershopAddress &&
+    formData.barbershopPhone;
+  const isStep2Valid =
+    formData.adminName &&
+    formData.adminEmail &&
+    formData.adminPassword &&
+    formData.confirmPassword &&
+    formData.adminPassword === formData.confirmPassword;
   const isStep3Valid = formData.acceptTerms && formData.acceptPrivacy;
 
   const stepConfig = [
     {
       number: 1,
-      title: 'Información de Barbería',
-      description: 'Datos básicos de tu negocio',
+      title: "Información de Barbería",
+      description: "Datos básicos de tu negocio",
       icon: Building,
-      color: 'bg-barbershop-red'
+      color: "bg-barbershop-red",
     },
     {
       number: 2,
-      title: 'Datos del Administrador',
-      description: 'Tu información personal',
+      title: "Datos del Administrador",
+      description: "Tu información personal",
       icon: User,
-      color: 'bg-barbershop-blue'
+      color: "bg-barbershop-blue",
     },
     {
       number: 3,
-      title: 'Términos y Condiciones',
-      description: 'Acepta nuestros términos',
+      title: "Términos y Condiciones",
+      description: "Acepta nuestros términos",
       icon: CheckCircle,
-      color: 'bg-green-500'
-    }
+      color: "bg-green-500",
+    },
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-gray-950 to-slate-900 relative overflow-hidden">
+    <div className="bg-gradient-to-br from-slate-950 via-gray-950 to-slate-900 relative overflow-hidden">
       {/* Sophisticated Background Elements */}
       <div className="absolute inset-0 pointer-events-none">
         {/* Primary gradient orb */}
@@ -111,13 +155,15 @@ export default function RegisterPage() {
 
       <div className="flex items-center justify-center min-h-screen p-4 sm:p-6 relative">
         {/* Back to Login */}
-        <Link 
-          href="/login" 
+        <Link
+          href="/login"
           className="absolute top-4 left-4 sm:top-8 sm:left-8 inline-flex items-center px-3 sm:px-4 py-2 text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 rounded-full transition-all duration-300 group focus:outline-none focus:ring-2 focus:ring-barbershop-red/50"
           aria-label="Volver al login"
         >
           <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 group-hover:-translate-x-0.5 transition-transform duration-300" />
-          <span className="text-xs sm:text-sm font-medium">Volver al Login</span>
+          <span className="text-xs sm:text-sm font-medium">
+            Volver al Login
+          </span>
         </Link>
 
         <div className="w-full max-w-2xl animate-fade-in-up mt-10">
@@ -134,6 +180,9 @@ export default function RegisterPage() {
             </p>
           </div>
 
+          
+            <Toaster position="top-right" /> 
+
           {/* Progress Indicator */}
           <div className="mb-8 sm:mb-12">
             <div className="flex items-center justify-center mb-6 sm:mb-8 max-w-3xl mx-auto px-4">
@@ -141,32 +190,41 @@ export default function RegisterPage() {
                 const IconComponent = step.icon;
                 const isActive = currentStep >= step.number;
                 const isCurrent = currentStep === step.number;
-                
+
                 return (
                   <div key={step.number} className="flex items-center">
                     <div className="relative flex items-center justify-center">
                       <div
                         className={`
                           w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-full flex items-center justify-center font-bold text-white transition-all duration-500 relative z-10
-                          ${isCurrent ? 'scale-110 shadow-xl' : 'scale-100'}
+                          ${isCurrent ? "scale-110 shadow-xl" : "scale-100"}
                         `}
                         style={{
-                          backgroundColor: isActive ? 
-                            step.number === 1 ? '#b02e2e' : 
-                            step.number === 2 ? '#2e4a7d' : 
-                            '#22c55e' 
-                            : '#374151'
+                          backgroundColor: isActive
+                            ? step.number === 1
+                              ? "#b02e2e"
+                              : step.number === 2
+                              ? "#2e4a7d"
+                              : "#22c55e"
+                            : "#374151",
                         }}
                       >
-                        <IconComponent className={`h-5 w-5 sm:h-6 sm:w-6 lg:h-7 lg:w-7 ${isCurrent ? 'animate-pulse' : ''}`} />
+                        <IconComponent
+                          className={`h-5 w-5 sm:h-6 sm:w-6 lg:h-7 lg:w-7 ${
+                            isCurrent ? "animate-pulse" : ""
+                          }`}
+                        />
                       </div>
                       {isActive && (
-                        <div 
+                        <div
                           className="absolute inset-0 rounded-full animate-pulse opacity-30"
                           style={{
-                            backgroundColor: step.number === 1 ? '#b02e2e' : 
-                              step.number === 2 ? '#2e4a7d' : 
-                              '#22c55e'
+                            backgroundColor:
+                              step.number === 1
+                                ? "#b02e2e"
+                                : step.number === 2
+                                ? "#2e4a7d"
+                                : "#22c55e",
                           }}
                         ></div>
                       )}
@@ -176,11 +234,14 @@ export default function RegisterPage() {
                         <div
                           className="h-1 rounded-full transition-all duration-500"
                           style={{
-                            backgroundColor: currentStep > step.number ? 
-                              step.number === 1 ? '#b02e2e' : 
-                              step.number === 2 ? '#2e4a7d' : 
-                              '#22c55e' 
-                              : '#374151'
+                            backgroundColor:
+                              currentStep > step.number
+                                ? step.number === 1
+                                  ? "#b02e2e"
+                                  : step.number === 2
+                                  ? "#2e4a7d"
+                                  : "#22c55e"
+                                : "#374151",
                           }}
                         />
                       </div>
@@ -189,7 +250,7 @@ export default function RegisterPage() {
                 );
               })}
             </div>
-            
+
             <div className="text-center px-4">
               <h2 className="text-lg sm:text-xl font-bold text-white mb-1 sm:mb-2">
                 {stepConfig[currentStep - 1]?.title}
@@ -281,7 +342,9 @@ export default function RegisterPage() {
                     disabled={!isStep1Valid}
                     className="w-full bg-gradient-to-r from-barbershop-red to-red-600 text-white py-3 sm:py-4 rounded-lg sm:rounded-xl font-semibold text-base sm:text-lg hover:from-barbershop-red/90 hover:to-red-600/90 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-barbershop-red/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden group"
                   >
-                    <span className="relative z-10">Siguiente: Datos del Administrador</span>
+                    <span className="relative z-10">
+                      Siguiente: Datos del Administrador
+                    </span>
                     <div className="absolute inset-0 bg-white/20 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
                   </button>
                 </div>
@@ -330,7 +393,7 @@ export default function RegisterPage() {
                         </label>
                         <div className="relative">
                           <input
-                            type={showPassword ? 'text' : 'password'}
+                            type={showPassword ? "text" : "password"}
                             name="adminPassword"
                             value={formData.adminPassword}
                             onChange={handleInputChange}
@@ -343,7 +406,11 @@ export default function RegisterPage() {
                             onClick={() => setShowPassword(!showPassword)}
                             className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-barbershop-blue transition-colors duration-300 focus:outline-none"
                           >
-                            {showPassword ? <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" /> : <Eye className="h-4 w-4 sm:h-5 sm:w-5" />}
+                            {showPassword ? (
+                              <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" />
+                            ) : (
+                              <Eye className="h-4 w-4 sm:h-5 sm:w-5" />
+                            )}
                           </button>
                         </div>
                       </div>
@@ -354,7 +421,7 @@ export default function RegisterPage() {
                         </label>
                         <div className="relative">
                           <input
-                            type={showConfirmPassword ? 'text' : 'password'}
+                            type={showConfirmPassword ? "text" : "password"}
                             name="confirmPassword"
                             value={formData.confirmPassword}
                             onChange={handleInputChange}
@@ -364,20 +431,30 @@ export default function RegisterPage() {
                           />
                           <button
                             type="button"
-                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            onClick={() =>
+                              setShowConfirmPassword(!showConfirmPassword)
+                            }
                             className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-barbershop-blue transition-colors duration-300 focus:outline-none"
                           >
-                            {showConfirmPassword ? <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" /> : <Eye className="h-4 w-4 sm:h-5 sm:w-5" />}
+                            {showConfirmPassword ? (
+                              <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" />
+                            ) : (
+                              <Eye className="h-4 w-4 sm:h-5 sm:w-5" />
+                            )}
                           </button>
                         </div>
                       </div>
                     </div>
 
-                    {formData.adminPassword && formData.confirmPassword && formData.adminPassword !== formData.confirmPassword && (
-                      <div className="p-3 sm:p-4 bg-red-500/10 border border-red-500/20 rounded-lg sm:rounded-xl backdrop-blur-sm">
-                        <p className="text-red-300 text-sm font-medium">Las contraseñas no coinciden</p>
-                      </div>
-                    )}
+                    {formData.adminPassword &&
+                      formData.confirmPassword &&
+                      formData.adminPassword !== formData.confirmPassword && (
+                        <div className="p-3 sm:p-4 bg-red-500/10 border border-red-500/20 rounded-lg sm:rounded-xl backdrop-blur-sm">
+                          <p className="text-red-300 text-sm font-medium">
+                            Las contraseñas no coinciden
+                          </p>
+                        </div>
+                      )}
                   </div>
 
                   <div className="flex gap-3 sm:gap-4">
@@ -412,7 +489,8 @@ export default function RegisterPage() {
                       ¡Casi listo!
                     </h3>
                     <p className="text-sm sm:text-base text-gray-400 px-4">
-                      Solo falta aceptar nuestros términos para completar el registro
+                      Solo falta aceptar nuestros términos para completar el
+                      registro
                     </p>
                   </div>
 
@@ -427,10 +505,13 @@ export default function RegisterPage() {
                         required
                       />
                       <span className="text-gray-300 group-hover:text-white transition-colors duration-300">
-                        Acepto los{' '}
-                        <Link href="/terms" className="text-barbershop-red hover:text-red-400 underline transition-colors duration-300">
+                        Acepto los{" "}
+                        <Link
+                          href="/terms"
+                          className="text-barbershop-red hover:text-red-400 underline transition-colors duration-300"
+                        >
                           Términos y Condiciones
-                        </Link>{' '}
+                        </Link>{" "}
                         de uso de BarberClub
                       </span>
                     </label>
@@ -445,10 +526,13 @@ export default function RegisterPage() {
                         required
                       />
                       <span className="text-gray-300 group-hover:text-white transition-colors duration-300">
-                        Acepto la{' '}
-                        <Link href="/privacy" className="text-barbershop-red hover:text-red-400 underline transition-colors duration-300">
+                        Acepto la{" "}
+                        <Link
+                          href="/privacy"
+                          className="text-barbershop-red hover:text-red-400 underline transition-colors duration-300"
+                        >
                           Política de Privacidad
-                        </Link>{' '}
+                        </Link>{" "}
                         y el tratamiento de mis datos personales
                       </span>
                     </label>
@@ -506,7 +590,9 @@ export default function RegisterPage() {
                         </div>
                       ) : (
                         <>
-                          <span className="relative z-10">🚀 Crear mi Barbería</span>
+                          <span className="relative z-10">
+                            🚀 Crear mi Barbería
+                          </span>
                           <div className="absolute inset-0 bg-white/20 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
                         </>
                       )}

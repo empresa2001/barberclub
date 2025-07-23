@@ -68,7 +68,6 @@ export interface Database {
         Insert: {
           id?: string
           email: string
-          password: string
           name: string
           user_type_id: number
           barber_id?: string | null
