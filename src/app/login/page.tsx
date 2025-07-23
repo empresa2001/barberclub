@@ -1,6 +1,6 @@
-"use client"
-import type React from "react"
-import { useState, useEffect } from "react"
+"use client";
+import type React from "react";
+import { useState, useEffect } from "react";
 import {
   Eye,
   EyeOff,
@@ -12,136 +12,177 @@ import {
   Users,
   AlertCircle,
   CheckCircle,
-} from "lucide-react"
-import Link from "next/link"
-import Logo from "@/components/Logo"
+} from "lucide-react";
+import Link from "next/link";
+import Logo from "@/components/Logo";
+import { useAuth } from "@/contexts/AuthContext";
+import toast from "react-hot-toast";
+import { supabase } from "@/lib/supabase";
+
 interface LoginData {
-  email: string
-  password: string
-  role: "superadmin" | "barbershop_admin" | "barber"
+  email: string;
+  password: string;
+  role: "superadmin" | "barbershop_admin" | "barber";
 }
 
 interface FormErrors {
-  email?: string
-  password?: string
-  general?: string
+  email?: string;
+  password?: string;
+  general?: string;
 }
 
 interface FormTouched {
-  email: boolean
-  password: boolean
+  email: boolean;
+  password: boolean;
 }
 
 export default function LoginPage() {
-  const [showPassword, setShowPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [selectedRole, setSelectedRole] = useState<LoginData["role"]>("barbershop_admin")
-  const [errors, setErrors] = useState<FormErrors>({})
-  const [touched, setTouched] = useState<FormTouched>({ email: false, password: false })
-  const [isFormValid, setIsFormValid] = useState(false)
+  const { login, loading: authLoading, user } = useAuth();
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedRole, setSelectedRole] =
+    useState<LoginData["role"]>("barbershop_admin");
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [touched, setTouched] = useState<FormTouched>({
+    email: false,
+    password: false,
+  });
+  const [isFormValid, setIsFormValid] = useState(false);
 
   const [formData, setFormData] = useState<LoginData>({
     email: "",
     password: "",
     role: "barbershop_admin",
-  })
+  });
 
   // Validation functions
   const validateEmail = (email: string): string | undefined => {
-    if (!email) return "El email es requerido"
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) return "Ingresa un email válido"
-    return undefined
-  }
+    if (!email) return "El email es requerido";
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) return "Ingresa un email válido";
+    return undefined;
+  };
 
   const validatePassword = (password: string): string | undefined => {
-    if (!password) return "La contraseña es requerida"
-    if (password.length < 6) return "La contraseña debe tener al menos 6 caracteres"
-    return undefined
-  }
+    if (!password) return "La contraseña es requerida";
+    if (password.length < 6)
+      return "La contraseña debe tener al menos 6 caracteres";
+    return undefined;
+  };
 
   // Validate form on data change
   useEffect(() => {
-    const newErrors: FormErrors = {}
+    const newErrors: FormErrors = {};
 
     if (touched.email) {
-      const emailError = validateEmail(formData.email)
-      if (emailError) newErrors.email = emailError
+      const emailError = validateEmail(formData.email);
+      if (emailError) newErrors.email = emailError;
     }
 
     if (touched.password) {
-      const passwordError = validatePassword(formData.password)
-      if (passwordError) newErrors.password = passwordError
+      const passwordError = validatePassword(formData.password);
+      if (passwordError) newErrors.password = passwordError;
     }
 
-    setErrors(newErrors)
+    setErrors(newErrors);
     setIsFormValid(
       formData.email !== "" &&
         formData.password !== "" &&
         !validateEmail(formData.email) &&
-        !validatePassword(formData.password),
-    )
-  }, [formData, touched])
+        !validatePassword(formData.password)
+    );
+  }, [formData, touched]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
 
     // Clear general error when user starts typing
     if (errors.general) {
-      setErrors((prev) => ({ ...prev, general: undefined }))
+      setErrors((prev) => ({ ...prev, general: undefined }));
     }
-  }
+  };
 
   const handleInputBlur = (field: keyof FormTouched) => {
-    setTouched((prev) => ({ ...prev, [field]: true }))
-  }
+    setTouched((prev) => ({ ...prev, [field]: true }));
+  };
 
   const handleRoleChange = (role: LoginData["role"]) => {
-    setSelectedRole(role)
-    setFormData((prev) => ({ ...prev, role }))
+    setSelectedRole(role);
+    setFormData((prev) => ({ ...prev, role }));
+  };
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault()
+  setTouched({ email: true, password: true })
+
+  const emailError = validateEmail(formData.email)
+  const passwordError = validatePassword(formData.password)
+
+  if (emailError || passwordError) {
+    setErrors({ email: emailError, password: passwordError })
+    return
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  setIsLoading(true)
+  setErrors({})
 
-    // Mark all fields as touched
-    setTouched({ email: true, password: true })
+  // 1. Login con Supabase Auth
+  const { error: loginError, user } = await login(formData.email, formData.password)
 
-    // Validate all fields
-    const emailError = validateEmail(formData.email)
-    const passwordError = validatePassword(formData.password)
-
-    if (emailError || passwordError) {
-      setErrors({
-        email: emailError,
-        password: passwordError,
-      })
-      return
-    }
-
-    setIsLoading(true)
-    setErrors({})
-
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      // Simulate login failure for demo
-      if (formData.email === "demo@error.com") {
-        throw new Error("Credenciales incorrectas")
-      }
-
-      console.log("Login successful:", formData)
-      // Here you would typically redirect or update app state
-    } catch (error) {
-      setErrors({
-        general: error instanceof Error ? error.message : "Error al iniciar sesión",
-      })
-    } finally {
-      setIsLoading(false)
-    }
+  if (loginError || !user) {
+    setIsLoading(false)
+    setErrors({ general: loginError || "Error de autenticación" })
+    toast.error(loginError || "Error de autenticación")
+    return
   }
+
+  // 2. Obtener datos extendidos del usuario desde la tabla pública
+  const { data: userRows, error: userFetchError } = await supabase
+    .from("users")
+    .select("user_type_id")
+    .eq("id", user.id)
+    .single()
+
+  if (userFetchError || !userRows) {
+    setIsLoading(false)
+    setErrors({ general: "No se pudo obtener el perfil del usuario." })
+    toast.error("No se pudo obtener el perfil del usuario.")
+    return
+  }
+
+  const userTypeId = userRows.user_type_id
+  const selectedRole = formData.role
+
+  // Validación de acceso según rol elegido
+  const canAccess =
+    (selectedRole === "superadmin" && userTypeId === 1) ||
+    (selectedRole === "barbershop_admin" && (userTypeId === 1 || userTypeId === 2)) ||
+    (selectedRole === "barber" && userTypeId === 3)
+
+  if (!canAccess) {
+    // Logout para que no quede sesión activa
+    await supabase.auth.signOut()
+    setIsLoading(false)
+    setErrors({ general: "No tienes permisos para acceder con este perfil." })
+    toast.error("No tienes permisos para acceder con este perfil.")
+    return
+  }
+
+  setIsLoading(false)
+  toast.success("¡Bienvenido! Redirigiendo...")
+
+  // Redirección basada en rol elegido
+  const roleRedirectMap: Record<string, string> = {
+    superadmin: "/admin",
+    barbershop_admin: "/adminBarber",
+    barber: "/barberBook",
+  }
+
+  window.location.href = roleRedirectMap[selectedRole]
+}
+
+
 
   const roles = [
     {
@@ -174,7 +215,7 @@ export default function LoginPage() {
       selectedColor:
         "bg-gradient-to-r from-amber-400/20 to-amber-400/10 border-amber-400 shadow-lg shadow-amber-400/20",
     },
-  ]
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-gray-950 to-slate-900 relative overflow-hidden">
@@ -207,15 +248,23 @@ export default function LoginPage() {
 
           {/* Role Selection */}
           <div className="mb-10">
-            <h2 className="text-xl font-semibold text-white mb-6 text-center">Selecciona tu perfil</h2>
-            <div className="space-y-3" role="radiogroup" aria-label="Seleccionar rol de usuario">
+            <h2 className="text-xl font-semibold text-white mb-6 text-center">
+              Selecciona tu perfil
+            </h2>
+            <div
+              className="space-y-3"
+              role="radiogroup"
+              aria-label="Seleccionar rol de usuario"
+            >
               {roles.map((role) => {
-                const IconComponent = role.icon
-                const isSelected = selectedRole === role.id
+                const IconComponent = role.icon;
+                const isSelected = selectedRole === role.id;
                 return (
                   <button
                     key={role.id}
-                    onClick={() => handleRoleChange(role.id as LoginData["role"])}
+                    onClick={() =>
+                      handleRoleChange(role.id as LoginData["role"])
+                    }
                     role="radio"
                     aria-checked={isSelected}
                     aria-label={`${role.label}: ${role.description}`}
@@ -236,7 +285,13 @@ export default function LoginPage() {
                         p-3 rounded-xl transition-all duration-300 
                         ${
                           isSelected
-                            ? `bg-gradient-to-br ${role.color.includes("barbershop-red") ? "from-barbershop-red/20 to-barbershop-red/10" : role.color.includes("barbershop-blue") ? "from-barbershop-blue/20 to-barbershop-blue/10" : "from-amber-400/20 to-amber-400/10"}`
+                            ? `bg-gradient-to-br ${
+                                role.color.includes("barbershop-red")
+                                  ? "from-barbershop-red/20 to-barbershop-red/10"
+                                  : role.color.includes("barbershop-blue")
+                                  ? "from-barbershop-blue/20 to-barbershop-blue/10"
+                                  : "from-amber-400/20 to-amber-400/10"
+                              }`
                             : "bg-white/10 group-hover:bg-white/15"
                         }
                       `}
@@ -244,7 +299,11 @@ export default function LoginPage() {
                         <IconComponent
                           className={`
                           h-6 w-6 transition-all duration-300
-                          ${isSelected ? role.color.split(" ")[0] : "text-gray-300 group-hover:text-white"}
+                          ${
+                            isSelected
+                              ? role.color.split(" ")[0]
+                              : "text-gray-300 group-hover:text-white"
+                          }
                         `}
                         />
                       </div>
@@ -252,7 +311,11 @@ export default function LoginPage() {
                         <div
                           className={`
                           font-semibold text-lg transition-colors duration-300
-                          ${isSelected ? "text-white" : "text-gray-200 group-hover:text-white"}
+                          ${
+                            isSelected
+                              ? "text-white"
+                              : "text-gray-200 group-hover:text-white"
+                          }
                         `}
                         >
                           {role.label}
@@ -270,7 +333,7 @@ export default function LoginPage() {
                       </div>
                     )}
                   </button>
-                )
+                );
               })}
             </div>
           </div>
@@ -284,20 +347,27 @@ export default function LoginPage() {
                   <div className="bg-red-500/20 rounded-full p-1">
                     <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0" />
                   </div>
-                  <span className="text-red-300 text-sm font-medium">{errors.general}</span>
+                  <span className="text-red-300 text-sm font-medium">
+                    {errors.general}
+                  </span>
                 </div>
               )}
 
               {/* Email Field */}
               <div className="relative group">
-                <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium text-gray-300 mb-2"
+                >
                   Correo electrónico
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <Mail
                       className={`h-5 w-5 transition-colors duration-300 ${
-                        errors.email ? "text-red-400" : "text-gray-400 group-focus-within:text-barbershop-red"
+                        errors.email
+                          ? "text-red-400"
+                          : "text-gray-400 group-focus-within:text-barbershop-red"
                       }`}
                     />
                   </div>
@@ -318,7 +388,11 @@ export default function LoginPage() {
                       focus:outline-none focus:ring-2 focus:ring-barbershop-red/50 focus:border-barbershop-red/50
                       transition-all duration-300 backdrop-blur-sm
                       hover:bg-white/10 hover:border-white/30
-                      ${errors.email ? "border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50" : "border-white/20"}
+                      ${
+                        errors.email
+                          ? "border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50"
+                          : "border-white/20"
+                      }
                     `}
                   />
                 </div>
@@ -335,14 +409,19 @@ export default function LoginPage() {
 
               {/* Password Field */}
               <div className="relative group">
-                <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-gray-300 mb-2"
+                >
                   Contraseña
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <Lock
                       className={`h-5 w-5 transition-colors duration-300 ${
-                        errors.password ? "text-red-400" : "text-gray-400 group-focus-within:text-barbershop-red"
+                        errors.password
+                          ? "text-red-400"
+                          : "text-gray-400 group-focus-within:text-barbershop-red"
                       }`}
                     />
                   </div>
@@ -356,23 +435,35 @@ export default function LoginPage() {
                     placeholder="••••••••"
                     required
                     aria-invalid={!!errors.password}
-                    aria-describedby={errors.password ? "password-error" : undefined}
+                    aria-describedby={
+                      errors.password ? "password-error" : undefined
+                    }
                     className={`
                       w-full pl-12 pr-14 py-4 bg-white/5 border-2 rounded-xl
                       text-white placeholder-gray-400 text-lg
                       focus:outline-none focus:ring-2 focus:ring-barbershop-red/50 focus:border-barbershop-red/50
                       transition-all duration-300 backdrop-blur-sm
                       hover:bg-white/10 hover:border-white/30
-                      ${errors.password ? "border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50" : "border-white/20"}
+                      ${
+                        errors.password
+                          ? "border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50"
+                          : "border-white/20"
+                      }
                     `}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    aria-label={
+                      showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
+                    }
                     className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-white transition-colors duration-300 focus:outline-none focus:text-barbershop-red"
                   >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
                   </button>
                 </div>
                 {errors.password && (
@@ -456,5 +547,5 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

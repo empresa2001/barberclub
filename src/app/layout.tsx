@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const poppins = Poppins({
   weight: ['300', '400', '500', '600', '700'],
@@ -45,7 +46,9 @@ export default function RootLayout({
       <body
         className={`${poppins.variable} font-sans antialiased bg-barbershop-black text-barbershop-white`}
       >
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

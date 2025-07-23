@@ -32,6 +32,8 @@ import { barbershopsApi } from '@/lib/api';
 import { lookupService } from '@/lib/database';
 import { ConfirmModal } from '@/components/ui';
 import toast, { Toaster } from 'react-hot-toast';
+import { useAuth } from "@/contexts/AuthContext";
+import { useRouter } from "next/navigation";
 
 // Tipo específico para las barberías con sus relaciones
 interface BarbershopWithRelations {
@@ -60,6 +62,16 @@ interface DashboardStats {
 }
 
 export default function AdminDashboard() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  // Redirigir si no está autenticado
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/login");
+    }
+  }, [user, loading, router]);
+
   const [stats, setStats] = useState<DashboardStats>({
     total_barbershops: 0,
     active_barbershops: 0,

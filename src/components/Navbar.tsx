@@ -5,8 +5,10 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import Logo from './Logo';
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Navbar() {
+  const { user, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrollY, setScrollY] = useState(0);
   const pathname = usePathname();
@@ -81,13 +83,22 @@ export default function Navbar() {
 
             {/* Right side - Iniciar Sesión */}
             <div className="hidden lg:flex items-center justify-end lg:flex-1">
-              <Link 
-                href="/login" 
-                className="relative bg-gradient-to-r from-barbershop-red via-red-600 to-barbershop-red bg-size-200 bg-pos-0 hover:bg-pos-100 text-white px-6 lg:px-8 py-2.5 lg:py-3 rounded-full font-semibold text-lg xl:text-xl transition-all duration-500 shadow-xl shadow-barbershop-red/30 hover:shadow-barbershop-red/50 hover:scale-105 group overflow-hidden"
-              >
-                <span className="relative z-10">Iniciar Sesión</span>
-                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-              </Link>
+              {user ? (
+                <button
+                  onClick={logout}
+                  className="px-4 py-2 bg-barbershop-red text-white rounded-lg hover:bg-red-700 transition-all"
+                >
+                  Cerrar sesión
+                </button>
+              ) : (
+                <Link 
+                  href="/login" 
+                  className="relative bg-gradient-to-r from-barbershop-red via-red-600 to-barbershop-red bg-size-200 bg-pos-0 hover:bg-pos-100 text-white px-6 lg:px-8 py-2.5 lg:py-3 rounded-full font-semibold text-lg xl:text-xl transition-all duration-500 shadow-xl shadow-barbershop-red/30 hover:shadow-barbershop-red/50 hover:scale-105 group overflow-hidden"
+                >
+                  <span className="relative z-10">Iniciar Sesión</span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+                </Link>
+              )}
             </div>
 
             {/* Mobile Menu Button */}
@@ -161,13 +172,22 @@ export default function Navbar() {
                 >
                   Contacto
                 </Link>
-                <Link 
-                  href="/login" 
-                  className="block bg-gradient-to-r from-barbershop-red to-red-600 text-white px-6 py-3 rounded-xl font-semibold text-center text-lg shadow-lg mt-4"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Iniciar Sesión
-                </Link>
+                {user ? (
+                  <button
+                    onClick={logout}
+                    className="block w-full bg-gradient-to-r from-barbershop-red to-red-600 text-white px-6 py-3 rounded-xl font-semibold text-center text-lg shadow-lg mt-4"
+                  >
+                    Cerrar sesión
+                  </button>
+                ) : (
+                  <Link 
+                    href="/login" 
+                    className="block bg-gradient-to-r from-barbershop-red to-red-600 text-white px-6 py-3 rounded-xl font-semibold text-center text-lg shadow-lg mt-4"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Iniciar Sesión
+                  </Link>
+                )}
               </div>
             </div>
           </div>
