@@ -137,10 +137,11 @@ const handleSubmit = async (e: React.FormEvent) => {
     return
   }
 
+
   // 2. Obtener datos extendidos del usuario desde la tabla pública
   const { data: userRows, error: userFetchError } = await supabase
     .from("users")
-    .select("user_type_id")
+    .select("user_type_id, is_active")
     .eq("id", user.id)
     .single()
 
@@ -151,35 +152,61 @@ const handleSubmit = async (e: React.FormEvent) => {
     return
   }
 
-  const userTypeId = userRows.user_type_id
-  const selectedRole = formData.role
+  const userTypeId = userRows.user_type_id;
+  const isActive = userRows.is_active !== false; // true si no existe o es true
+  const selectedRole = formData.role;
+
+  // Si es barbero y está desactivado, no permitir login
+  if (selectedRole === "barber" && !isActive) {
+    await supabase.auth.signOut();
+    setIsLoading(false);
+    setErrors({ general: "Tu cuenta de barbero está desactivada. Consulta con el administrador." });
+    toast.error("Tu cuenta de barbero está desactivada. Consulta con el administrador.");
+    return;
+  }
 
   // Validación de acceso según rol elegido
   const canAccess =
     (selectedRole === "superadmin" && userTypeId === 1) ||
     (selectedRole === "barbershop_admin" && (userTypeId === 1 || userTypeId === 2)) ||
-    (selectedRole === "barber" && userTypeId === 3)
+    (selectedRole === "barber" && userTypeId === 3);
 
   if (!canAccess) {
     // Logout para que no quede sesión activa
-    await supabase.auth.signOut()
-    setIsLoading(false)
-    setErrors({ general: "No tienes permisos para acceder con este perfil." })
-    toast.error("No tienes permisos para acceder con este perfil.")
-    return
+    await supabase.auth.signOut();
+    setIsLoading(false);
+    setErrors({ general: "No tienes permisos para acceder con este perfil." });
+    toast.error("No tienes permisos para acceder con este perfil.");
+    return;
   }
 
   setIsLoading(false)
   toast.success("¡Bienvenido! Redirigiendo...")
 
   // Redirección basada en rol elegido
-  const roleRedirectMap: Record<string, string> = {
-    superadmin: "/admin",
-    barbershop_admin: "/adminBarber",
-    barber: "/barberBook",
+  if (selectedRole === "barbershop_admin") {
+    // Buscar barbería donde el usuario es owner
+    const { data: barbershop, error: barbershopError } = await supabase
+      .from("barbershops")
+      .select("id")
+      .eq("owner_id", user.id)
+      .maybeSingle();
+    if (barbershopError || !barbershop) {
+      toast.error("No se encontró la barbería asociada a este usuario.");
+      setErrors({ general: "No se encontró la barbería asociada a este usuario." });
+      return;
+    }
+    window.location.href = `/adminBarber/${barbershop.id}`;
+    return;
   }
-
-  window.location.href = roleRedirectMap[selectedRole]
+  if (selectedRole === "superadmin") {
+    window.location.href = "/admin";
+    return;
+  }
+  if (selectedRole === "barber") {
+    window.location.href = "/barberBook";
+    return;
+  }
 }
 
 
