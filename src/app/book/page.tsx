@@ -1,194 +1,675 @@
 'use client';
 
 import { Calendar, Clock, MapPin, User, Phone, Mail } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/lib/supabase';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
 export default function BookPage() {
+
   const [selectedBarbershop, setSelectedBarbershop] = useState('');
   const [selectedBarber, setSelectedBarber] = useState('');
   const [selectedService, setSelectedService] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
+  const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
 
-  const barbershops = [
-    { id: 1, name: "Elite Barber Club", address: "Av. Corrientes 1234, CABA" },
-    { id: 2, name: "Classic Cuts", address: "San Martín 567, Palermo" },
-    { id: 3, name: "Modern Style Barber", address: "Av. Santa Fe 2890, Recoleta" },
-    { id: 4, name: "Gentleman's Choice", address: "Florida 875, Microcentro" },
-    { id: 5, name: "Urban Cuts", address: "Gorriti 4567, Villa Crick" },
-    { id: 6, name: "Royal Barber", address: "Av. Cabildo 1523, Belgrano" },
-  ];
+  // Datos reales desde Supabase
+  const [barbershops, setBarbershops] = useState<any[]>([]);
+  const [barbers, setBarbers] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>('');
 
-  const barbersByBarbershop = {
-    1: [
-      { id: 1, name: "Carlos Martínez", specialty: "Cortes Modernos" },
-      { id: 2, name: "Diego López", specialty: "Barbas Profesionales" },
-    ],
-    2: [
-      { id: 3, name: "Miguel Torres", specialty: "Cortes Clásicos" },
-      { id: 4, name: "Roberto Silva", specialty: "Estilo Vintage" },
-    ],
-    3: [
-      { id: 5, name: "Alejandro Ruiz", specialty: "Fades Modernos" },
-      { id: 6, name: "Fernando Castro", specialty: "Diseño de Barba" },
-    ],
-    4: [
-      { id: 7, name: "Sebastián Morales", specialty: "Estilo Ejecutivo" },
-      { id: 8, name: "Pablo Herrera", specialty: "Afeitado Tradicional" },
-    ],
-    5: [
-      { id: 9, name: "Matías Jiménez", specialty: "Estilos Urbanos" },
-      { id: 10, name: "Lucas Vargas", specialty: "Color y Mechas" },
-    ],
-    6: [
-      { id: 11, name: "Ricardo Mendoza", specialty: "Servicio Premium" },
-      { id: 12, name: "Andrés Paredes", specialty: "Experiencia Completa" },
-    ],
-  };
+  // Horarios disponibles desde Supabase (tabla schedules)
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
+  const [allTimeSlots, setAllTimeSlots] = useState<{time: string, available: boolean}[]>([]);
 
-  const servicesByBarber = {
-    1: [ // Carlos Martínez - Cortes Modernos
-      { id: 1, name: "Corte Fade Moderno", duration: "45 min", price: "$4.500" },
-      { id: 2, name: "Corte + Barba Moderna", duration: "60 min", price: "$6.200" },
-      { id: 3, name: "Diseño de Cabello", duration: "50 min", price: "$5.800" },
-    ],
-    2: [ // Diego López - Barbas Profesionales
-      { id: 4, name: "Afeitado Tradicional", duration: "30 min", price: "$3.200" },
-      { id: 5, name: "Diseño de Barba", duration: "40 min", price: "$4.800" },
-      { id: 6, name: "Corte + Barba Premium", duration: "70 min", price: "$7.500" },
-    ],
-    3: [ // Miguel Torres - Cortes Clásicos
-      { id: 7, name: "Corte Clásico", duration: "30 min", price: "$3.500" },
-      { id: 8, name: "Corte Ejecutivo", duration: "35 min", price: "$4.000" },
-      { id: 9, name: "Corte + Afeitado Clásico", duration: "50 min", price: "$5.500" },
-    ],
-    4: [ // Roberto Silva - Estilo Vintage
-      { id: 10, name: "Corte Vintage", duration: "40 min", price: "$4.200" },
-      { id: 11, name: "Pompadour Clásico", duration: "45 min", price: "$4.800" },
-      { id: 12, name: "Experiencia Vintage Completa", duration: "80 min", price: "$8.500" },
-    ],
-    5: [ // Alejandro Ruiz - Fades Modernos
-      { id: 13, name: "Fade Bajo", duration: "35 min", price: "$3.800" },
-      { id: 14, name: "Fade Alto", duration: "40 min", price: "$4.200" },
-      { id: 15, name: "Fade + Diseño", duration: "55 min", price: "$6.000" },
-    ],
-    6: [ // Fernando Castro - Diseño de Barba
-      { id: 16, name: "Perfilado de Barba", duration: "25 min", price: "$2.800" },
-      { id: 17, name: "Diseño Artístico", duration: "45 min", price: "$5.200" },
-      { id: 18, name: "Tratamiento de Barba", duration: "35 min", price: "$4.000" },
-    ],
-    7: [ // Sebastián Morales - Estilo Ejecutivo
-      { id: 19, name: "Corte Ejecutivo Premium", duration: "40 min", price: "$4.800" },
-      { id: 20, name: "Corte + Afeitado Ejecutivo", duration: "55 min", price: "$6.500" },
-      { id: 21, name: "Paquete Empresarial", duration: "70 min", price: "$8.000" },
-    ],
-    8: [ // Pablo Herrera - Afeitado Tradicional
-      { id: 22, name: "Afeitado con Navaja", duration: "30 min", price: "$3.500" },
-      { id: 23, name: "Afeitado Premium", duration: "45 min", price: "$4.800" },
-      { id: 24, name: "Experiencia Tradicional", duration: "60 min", price: "$6.500" },
-    ],
-    9: [ // Matías Jiménez - Estilos Urbanos
-      { id: 25, name: "Corte Urbano", duration: "35 min", price: "$3.800" },
-      { id: 26, name: "Estilo Rapper", duration: "45 min", price: "$4.500" },
-      { id: 27, name: "Diseño Urbano + Color", duration: "90 min", price: "$9.500" },
-    ],
-    10: [ // Lucas Vargas - Color y Mechas
-      { id: 28, name: "Mechas Sutiles", duration: "120 min", price: "$12.000" },
-      { id: 29, name: "Color Completo", duration: "150 min", price: "$15.000" },
-      { id: 30, name: "Corte + Color", duration: "180 min", price: "$18.500" },
-    ],
-    11: [ // Ricardo Mendoza - Servicio Premium
-      { id: 31, name: "Experiencia Premium", duration: "90 min", price: "$12.500" },
-      { id: 32, name: "Tratamiento VIP", duration: "120 min", price: "$18.000" },
-      { id: 33, name: "Paquete Royal", duration: "150 min", price: "$25.000" },
-    ],
-    12: [ // Andrés Paredes - Experiencia Completa
-      { id: 34, name: "Makeover Completo", duration: "120 min", price: "$15.500" },
-      { id: 35, name: "Experiencia Spa", duration: "150 min", price: "$20.000" },
-      { id: 36, name: "Transformación Total", duration: "180 min", price: "$28.000" },
-    ],
-  };
+  // Cargar barberías al montar
+  useEffect(() => {
+    const fetchBarbershops = async () => {
+      const { data, error } = await supabase.from('barbershops').select('*').order('name');
+      if (!error) setBarbershops(data || []);
+    };
+    fetchBarbershops();
+  }, []);
 
-  const timeSlotsByBarber = {
-    1: [ // Carlos Martínez - Cortes Modernos
-      "10:00", "10:30", "11:00", "11:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30"
-    ],
-    2: [ // Diego López - Barbas Profesionales
-      "09:00", "09:30", "10:00", "11:00", "11:30", "15:00", "15:30", "16:00", "16:30", "17:00"
-    ],
-    3: [ // Miguel Torres - Cortes Clásicos
-      "09:00", "09:30", "10:00", "10:30", "11:00", "14:00", "14:30", "15:00", "15:30", "16:00"
-    ],
-    4: [ // Roberto Silva - Estilo Vintage
-      "10:00", "10:30", "11:00", "11:30", "12:00", "15:00", "15:30", "16:00", "16:30", "17:00"
-    ],
-    5: [ // Alejandro Ruiz - Fades Modernos
-      "09:30", "10:00", "10:30", "11:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00"
-    ],
-    6: [ // Fernando Castro - Diseño de Barba
-      "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "15:00", "15:30", "16:00", "16:30"
-    ],
-    7: [ // Sebastián Morales - Estilo Ejecutivo
-      "08:30", "09:00", "09:30", "10:00", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30"
-    ],
-    8: [ // Pablo Herrera - Afeitado Tradicional
-      "09:00", "09:30", "10:00", "10:30", "11:00", "15:00", "15:30", "16:00", "16:30", "17:00"
-    ],
-    9: [ // Matías Jiménez - Estilos Urbanos
-      "11:00", "11:30", "12:00", "14:00", "14:30", "15:00", "15:30", "16:00", "17:00", "17:30"
-    ],
-    10: [ // Lucas Vargas - Color y Mechas
-      "09:00", "10:00", "11:00", "14:00", "15:00", "16:00" // Horarios más espaciados para servicios largos
-    ],
-    11: [ // Ricardo Mendoza - Servicio Premium
-      "09:00", "10:30", "12:00", "14:00", "15:30", "17:00" // Horarios VIP espaciados
-    ],
-    12: [ // Andrés Paredes - Experiencia Completa
-      "08:00", "10:00", "12:00", "14:00", "16:00" // Sesiones largas, pocos horarios
-    ],
-  };
+  // Cargar barberos (con nombre) cuando cambia la barbería
+  useEffect(() => {
+    if (!selectedBarbershop) {
+      setBarbers([]);
+      setServices([]);
+      setSelectedBarber('');
+      setSelectedService('');
+      return;
+    }
+    const fetchBarbers = async () => {
+      // Join correcto: traer barberos y el usuario relacionado (nombre y email)
+      // Si no existe la relación barbers_user_id_fkey, usar users(user_id)
+      const { data, error } = await supabase
+        .from('barbers')
+        .select('id, user_id, users(name, email)')
+        .eq('barbershop_id', selectedBarbershop);
+      if (!error && data) setBarbers(data);
+    };
+    fetchBarbers();
+  }, [selectedBarbershop]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Cargar servicios cuando cambia el barbero
+  useEffect(() => {
+    if (!selectedBarbershop) {
+      setServices([]);
+      setSelectedService('');
+      return;
+    }
+    const fetchServices = async () => {
+      const { data, error } = await supabase
+        .from('services')
+        .select('*')
+        .eq('barbershop_id', selectedBarbershop)
+        .order('name');
+      if (!error) setServices(data || []);
+    };
+    fetchServices();
+  }, [selectedBarbershop]);
+
+  useEffect(() => {
+    // Solo buscar si hay barbero, fecha y servicio seleccionados
+    if (!selectedBarber || !selectedDate || !selectedService) {
+      setAvailableTimeSlots([]);
+      setAllTimeSlots([]);
+      return;
+    }
+
+    let isCancelled = false; // Flag para cancelar requests obsoletos
+
+    const fetchAvailableSlots = async () => {
+      const dayOfWeek = new Date(selectedDate).getDay();
+      console.log('[DEBUG][BOOK] Fetching schedules for barber:', selectedBarber, 'date:', selectedDate, 'dayOfWeek:', dayOfWeek);
+      
+      // 1. Obtener horarios del barbero
+      const { data: schedules, error: schedError } = await supabase
+        .from('schedules')
+        .select('from_time, to_time')
+        .eq('barber_id', selectedBarber.toString())
+        .eq('day_of_week', dayOfWeek);
+
+      if (isCancelled) return; // No continuar si el efecto fue cancelado
+
+      if (schedError || !schedules?.length) {
+        console.log('[DEBUG][BOOK] No schedules found:', schedError);
+        setAvailableTimeSlots([]);
+        setAllTimeSlots([]);
+        return;
+      }
+
+      // 2. Generar todos los slots posibles
+      const allSlots: string[] = [];
+      schedules.forEach((sch: any) => {
+        let [h, m] = sch.from_time.split(':').map(Number);
+        const [endH, endM] = sch.to_time.split(':').map(Number);
+        
+        while (h < endH || (h === endH && m < endM)) {
+          allSlots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+          m += 30;
+          if (m >= 60) { h++; m = 0; }
+        }
+      });
+
+      // 3. Obtener duración del servicio
+      const selectedServiceObj = services.find(s => s.id === selectedService);
+      const serviceDuration = selectedServiceObj?.duration_min || 30;
+      
+      // 4. Verificar excepciones de horario para este día
+      console.log(`[DEBUG] Checking schedule exceptions for barber ${selectedBarber} on ${selectedDate}`);
+      
+      const { data: scheduleExceptions } = await supabase
+        .from('schedule_exceptions')
+        .select('from_time, to_time')
+        .eq('barber_id', selectedBarber)
+        .eq('date', selectedDate);
+
+      console.log('[DEBUG] Schedule exceptions found:', scheduleExceptions);
+
+      // Si hay una excepción que bloquea todo el día (from_time y to_time son null)
+      const dayBlockedException = scheduleExceptions?.find(exc => exc.from_time === null && exc.to_time === null);
+      if (dayBlockedException) {
+        console.log('[DEBUG] Barber does not work on this day (full day exception)');
+        setAvailableTimeSlots([]);
+        setAllTimeSlots([]); // Establecer array vacío para indicar que no trabaja
+        return;
+      }
+
+      // 5. Una sola consulta para obtener todas las citas del día
+      const selectedDateObj = new Date(selectedDate + 'T00:00:00');
+      const startOfDay = new Date(selectedDateObj);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(selectedDateObj);
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      console.log(`[DEBUG] Fetching appointments for barber ${selectedBarber} on ${selectedDate}`);
+      console.log(`[DEBUG] Date range: ${startOfDay.toISOString()} to ${endOfDay.toISOString()}`);
+      
+      const { data: existingAppointments } = await supabase
+        .from('appointments')
+        .select('date, duration_min')
+        .eq('barber_id', selectedBarber)
+        .neq('status_id', 3) // Excluir canceladas
+        .gte('date', startOfDay.toISOString())
+        .lte('date', endOfDay.toISOString());
+
+      console.log('[DEBUG] Existing appointments found:', existingAppointments);
+
+      if (isCancelled) return;
+
+      // 6. Verificar disponibilidad para cada slot
+      const slotsWithAvailability: {time: string, available: boolean}[] = [];
+      const availableSlots: string[] = [];
+      
+      for (const timeSlot of allSlots) {
+        if (isCancelled) return; // Cancelar si el efecto cambió
+        
+        // Verificar si ya existe una cita en esta fecha y hora exacta
+        let isAvailable = true;
+        
+        console.log(`[DEBUG] Checking availability for slot: ${timeSlot} (service duration: ${serviceDuration} min)`);
+        
+        // Calcular cuántos slots necesita este servicio
+        const slotsNeeded = Math.ceil(serviceDuration / 30);
+        console.log(`[DEBUG] Service needs ${slotsNeeded} slots (${serviceDuration} min ÷ 30 min)`);
+        
+        // Verificar si este slot y los siguientes están disponibles
+        const currentSlotIndex = allSlots.indexOf(timeSlot);
+        
+        for (let i = 0; i < slotsNeeded; i++) {
+          const checkSlotIndex = currentSlotIndex + i;
+          
+          // Verificar que no se salga del rango de slots disponibles
+          if (checkSlotIndex >= allSlots.length) {
+            console.log(`[DEBUG] Slot ${timeSlot} not available: extends beyond working hours`);
+            isAvailable = false;
+            break;
+          }
+          
+          const checkSlot = allSlots[checkSlotIndex];
+          console.log(`[DEBUG] Checking required slot ${i + 1}/${slotsNeeded}: ${checkSlot}`);
+          
+          // Verificar si este slot está bloqueado por una excepción de horario
+          for (const exc of scheduleExceptions || []) {
+            if (exc.from_time && exc.to_time) {
+              // Convertir las horas a minutos para comparar más fácilmente
+              const excFromMinutes = exc.from_time.split(':').reduce((h, m) => h * 60 + parseInt(m), 0);
+              const excToMinutes = exc.to_time.split(':').reduce((h, m) => h * 60 + parseInt(m), 0);
+              const slotMinutes = checkSlot.split(':').reduce((h, m) => h * 60 + parseInt(m), 0);
+              
+              if (slotMinutes >= excFromMinutes && slotMinutes < excToMinutes) {
+                console.log(`[DEBUG] Slot ${checkSlot} blocked by modified schedule (${exc.from_time} - ${exc.to_time})`);
+                isAvailable = false;
+                break;
+              }
+            }
+          }
+          
+          if (!isAvailable) break;
+          
+          // Verificar conflictos con citas existentes para este slot específico
+          for (const apt of existingAppointments || []) {
+            const existingDate = new Date(apt.date);
+            
+            // Extraer solo la fecha de la cita existente para comparar
+            const existingDateOnly = existingDate.toISOString().split('T')[0];
+            
+            // Solo procesar citas del día seleccionado
+            if (existingDateOnly !== selectedDate) {
+              continue;
+            }
+            
+            // Formatear la hora de la cita existente usando UTC
+            const existingHours = existingDate.getUTCHours().toString().padStart(2, '0');
+            const existingMinutes = existingDate.getUTCMinutes().toString().padStart(2, '0');
+            const existingTime = `${existingHours}:${existingMinutes}`;
+            
+            // Verificar si hay conflicto con cualquiera de los slots necesarios
+            if (existingTime === checkSlot) {
+              console.log(`[DEBUG] Conflict found: slot ${checkSlot} is occupied by existing appointment`);
+              isAvailable = false;
+              break;
+            }
+            
+            // También verificar si la cita existente se extiende hacia este slot
+            const existingDuration = apt.duration_min || 30;
+            const existingSlotsNeeded = Math.ceil(existingDuration / 30);
+            const existingSlotIndex = allSlots.indexOf(existingTime);
+            
+            if (existingSlotIndex !== -1) {
+              // Verificar si el slot actual está dentro del rango de la cita existente
+              if (checkSlotIndex >= existingSlotIndex && checkSlotIndex < (existingSlotIndex + existingSlotsNeeded)) {
+                console.log(`[DEBUG] Conflict found: slot ${checkSlot} is within range of existing ${existingDuration}min appointment at ${existingTime}`);
+                isAvailable = false;
+                break;
+              }
+            }
+          }
+          
+          if (!isAvailable) break;
+        }
+        
+        console.log(`[DEBUG] Slot ${timeSlot} availability: ${isAvailable ? '✅ AVAILABLE' : '❌ OCCUPIED'}`);
+        
+        slotsWithAvailability.push({ time: timeSlot, available: isAvailable });
+        if (isAvailable) {
+          availableSlots.push(timeSlot);
+        }
+      }
+
+      if (!isCancelled) {
+        console.log('[DEBUG][BOOK] Available slots after filtering:', availableSlots);
+        setAvailableTimeSlots(availableSlots);
+        setAllTimeSlots(slotsWithAvailability);
+      }
+    };
+
+    fetchAvailableSlots();
+
+    // Cleanup function para cancelar requests obsoletos
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedBarber, selectedDate, selectedService]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Aquí iría la lógica para enviar el turno
-    console.log({
-      selectedBarbershop,
-      selectedBarber,
-      selectedService,
-      selectedDate,
-      selectedTime,
-      customerPhone,
-      customerEmail
-    });
-    alert('¡Turno agendado exitosamente! Te enviaremos la confirmación por email.');
+    setLoading(true);
+    setError('');
+
+    try {
+      // Validar campos requeridos
+      if (!selectedBarbershop || !selectedBarber || !selectedService || !selectedDate || !selectedTime || !customerName || !customerEmail) {
+        setError('Por favor completa todos los campos requeridos.');
+        setLoading(false);
+        return;
+      }
+
+      // Verificar que el horario seleccionado esté disponible
+      const selectedSlot = allTimeSlots.find(slot => slot.time === selectedTime);
+      if (!selectedSlot || !selectedSlot.available) {
+        setError('El horario seleccionado no está disponible. Por favor selecciona otro.');
+        setLoading(false);
+        return;
+      }
+
+      // Buscar duración del servicio seleccionado
+      const selectedServiceObj = services.find(s => s.id === selectedService);
+      if (!selectedServiceObj) {
+        setError('Servicio no encontrado.');
+        setLoading(false);
+        return;
+      }
+
+      // Crear timestamp completo
+      const appointmentDateTime = `${selectedDate}T${selectedTime}:00`;
+      
+      // Verificación final de disponibilidad justo antes de insertar
+      const selectedDateObj = new Date(selectedDate + 'T00:00:00');
+      const startOfDay = new Date(selectedDateObj);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(selectedDateObj);
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      // Verificar excepciones de horario antes de continuar
+      console.log(`[DEBUG] Final check: Verifying schedule exceptions for ${selectedDate}`);
+      const { data: finalScheduleExceptions } = await supabase
+        .from('schedule_exceptions')
+        .select('from_time, to_time')
+        .eq('barber_id', selectedBarber)
+        .eq('date', selectedDate);
+
+      // Si hay una excepción que bloquea todo el día
+      const dayBlocked = finalScheduleExceptions?.find(exc => exc.from_time === null && exc.to_time === null);
+      if (dayBlocked) {
+        console.log('[DEBUG] ❌ CONFLICT: Day is completely blocked by exception');
+        setError('El barbero no trabaja en la fecha seleccionada. Por favor selecciona otra fecha.');
+        setLoading(false);
+        return;
+      }
+
+      // Verificar si el horario específico está bloqueado por excepciones
+      for (const exc of finalScheduleExceptions || []) {
+        if (exc.from_time && exc.to_time) {
+          const excFromMinutes = exc.from_time.split(':').reduce((h, m) => h * 60 + parseInt(m), 0);
+          const excToMinutes = exc.to_time.split(':').reduce((h, m) => h * 60 + parseInt(m), 0);
+          const selectedTimeMinutes = selectedTime.split(':').reduce((h, m) => h * 60 + parseInt(m), 0);
+          
+          if (selectedTimeMinutes >= excFromMinutes && selectedTimeMinutes < excToMinutes) {
+            console.log(`[DEBUG] ❌ CONFLICT: Time ${selectedTime} is blocked by schedule exception`);
+            setError('El barbero tiene horario modificado para esa fecha y no puede atender en el horario seleccionado. Por favor selecciona otro horario.');
+            setLoading(false);
+            return;
+          }
+        }
+      }
+      
+      const { data: existingAppointments, error: checkError } = await supabase
+        .from('appointments')
+        .select('date, duration_min')
+        .eq('barber_id', selectedBarber)
+        .neq('status_id', 3) // Excluir canceladas
+        .gte('date', startOfDay.toISOString())
+        .lte('date', endOfDay.toISOString());
+
+      if (checkError) {
+        console.error('Error checking availability:', checkError);
+        setError('Error verificando disponibilidad. Intenta nuevamente.');
+        setLoading(false);
+        return;
+      }
+
+      console.log(`[DEBUG] Final availability check for ${selectedTime} on ${selectedDate}`);
+      console.log(`[DEBUG] Selected service duration: ${selectedServiceObj.duration_min} minutes`);
+      console.log(`[DEBUG] Found ${existingAppointments?.length || 0} existing appointments`);
+      
+      // Calcular cuántos slots necesita este servicio
+      const slotsNeeded = Math.ceil(selectedServiceObj.duration_min / 30);
+      console.log(`[DEBUG] Service needs ${slotsNeeded} consecutive slots`);
+      
+      // Generar todos los slots para verificar disponibilidad
+      const dayOfWeek = new Date(selectedDate).getDay();
+      const { data: schedules } = await supabase
+        .from('schedules')
+        .select('from_time, to_time')
+        .eq('barber_id', selectedBarber)
+        .eq('day_of_week', dayOfWeek);
+      
+      const allSlots: string[] = [];
+      if (schedules?.length) {
+        schedules.forEach((sch: any) => {
+          let [h, m] = sch.from_time.split(':').map(Number);
+          const [endH, endM] = sch.to_time.split(':').map(Number);
+          
+          while (h < endH || (h === endH && m < endM)) {
+            allSlots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+            m += 30;
+            if (m >= 60) { h++; m = 0; }
+          }
+        });
+      }
+      
+      const currentSlotIndex = allSlots.indexOf(selectedTime);
+      
+      // Verificar que hay suficientes slots consecutivos disponibles
+      for (let i = 0; i < slotsNeeded; i++) {
+        const checkSlotIndex = currentSlotIndex + i;
+        
+        // Verificar que no se salga del rango
+        if (checkSlotIndex >= allSlots.length) {
+          console.log(`[DEBUG] ❌ CONFLICT: Service extends beyond working hours`);
+          setError('El servicio seleccionado no puede completarse en el horario de trabajo. Por favor selecciona un horario más temprano.');
+          setLoading(false);
+          return;
+        }
+        
+        const checkSlot = allSlots[checkSlotIndex];
+        console.log(`[DEBUG] Checking required slot ${i + 1}/${slotsNeeded}: ${checkSlot}`);
+        
+        // Verificar conflictos para este slot específico
+        for (const apt of existingAppointments || []) {
+          const existingDate = new Date(apt.date);
+          
+          // Extraer solo la fecha de la cita existente para comparar
+          const existingDateOnly = existingDate.toISOString().split('T')[0];
+          
+          // Solo procesar citas del día seleccionado
+          if (existingDateOnly !== selectedDate) {
+            continue;
+          }
+          
+          // Formatear la hora de la cita existente usando UTC
+          const existingHours = existingDate.getUTCHours().toString().padStart(2, '0');
+          const existingMinutes = existingDate.getUTCMinutes().toString().padStart(2, '0');
+          const existingTime = `${existingHours}:${existingMinutes}`;
+          
+          // Verificar conflicto directo
+          if (existingTime === checkSlot) {
+            console.log(`[DEBUG] ❌ CONFLICT DETECTED: Required slot ${checkSlot} is occupied`);
+            setError('Lo sentimos, ese horario ya no está disponible. Por favor selecciona otro.');
+            setLoading(false);
+            return;
+          }
+          
+          // Verificar si la cita existente se extiende hacia este slot
+          const existingDuration = apt.duration_min || 30;
+          const existingSlotsNeeded = Math.ceil(existingDuration / 30);
+          const existingSlotIndex = allSlots.indexOf(existingTime);
+          
+          if (existingSlotIndex !== -1 && checkSlotIndex >= existingSlotIndex && checkSlotIndex < (existingSlotIndex + existingSlotsNeeded)) {
+            console.log(`[DEBUG] ❌ CONFLICT DETECTED: Required slot ${checkSlot} conflicts with existing ${existingDuration}min appointment at ${existingTime}`);
+            setError('Lo sentimos, ese horario ya no está disponible. Por favor selecciona otro.');
+            setLoading(false);
+            return;
+          }
+        }
+      }
+      
+      console.log(`[DEBUG] ✅ No conflicts found, proceeding with booking`);
+
+      console.log('[DEBUG] Inserting appointment:', {
+        barber_id: selectedBarber,
+        service_id: selectedService,
+        date: appointmentDateTime,
+        duration_min: selectedServiceObj.duration_min,
+        customer_name: customerName
+      });
+
+      // Insertar la cita
+      const { error } = await supabase.from('appointments').insert([
+        {
+          barber_id: selectedBarber,
+          service_id: selectedService,
+          date: appointmentDateTime,
+          duration_min: selectedServiceObj.duration_min,
+          status_id: 1, // Pendiente
+          customer_name: customerName,
+          customer_email: customerEmail,
+          customer_phone: customerPhone || null,
+        },
+      ]);
+
+      setLoading(false);
+
+      if (error) {
+        console.error('Error creating appointment:', error);
+        setError('Ocurrió un error al agendar el turno. Intenta nuevamente.');
+      } else {
+        alert(`¡Turno agendado exitosamente para ${selectedDate} a las ${selectedTime}! Te enviaremos la confirmación por email.`);
+        
+        // Resetear formulario
+        setSelectedBarbershop('');
+        setSelectedBarber('');
+        setSelectedService('');
+        setSelectedDate('');
+        setSelectedTime('');
+        setCustomerName('');
+        setCustomerEmail('');
+        setCustomerPhone('');
+        
+        // Refrescar disponibilidad después de reserva exitosa
+        const refreshAvailability = async () => {
+          if (selectedBarber && selectedDate && selectedService) {
+            // Forzar refresco de horarios disponibles
+            const dayOfWeek = new Date(selectedDate).getDay();
+            
+            // Obtener horarios del barbero
+            const { data: schedules } = await supabase
+              .from('schedules')
+              .select('from_time, to_time')
+              .eq('barber_id', selectedBarber)
+              .eq('day_of_week', dayOfWeek);
+
+            if (schedules?.length) {
+              // Generar todos los slots posibles
+              const allSlots: string[] = [];
+              schedules.forEach((sch: any) => {
+                let [h, m] = sch.from_time.split(':').map(Number);
+                const [endH, endM] = sch.to_time.split(':').map(Number);
+                
+                while (h < endH || (h === endH && m < endM)) {
+                  allSlots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+                  m += 30;
+                  if (m >= 60) { h++; m = 0; }
+                }
+              });
+
+              // Obtener excepciones de horario
+              const { data: scheduleExceptions } = await supabase
+                .from('schedule_exceptions')
+                .select('from_time, to_time')
+                .eq('barber_id', selectedBarber)
+                .eq('date', selectedDate);
+
+              // Si hay una excepción que bloquea todo el día
+              const dayBlockedException = scheduleExceptions?.find(exc => exc.from_time === null && exc.to_time === null);
+              if (dayBlockedException) {
+                console.log('[DEBUG] Refresh: Barber does not work on this day');
+                setAllTimeSlots([]); // Array vacío para indicar que no trabaja
+                setAvailableTimeSlots([]);
+                return;
+              }
+
+              // Obtener citas existentes
+              const selectedDateObj = new Date(selectedDate + 'T00:00:00');
+              const startOfDay = new Date(selectedDateObj);
+              startOfDay.setHours(0, 0, 0, 0);
+              const endOfDay = new Date(selectedDateObj);
+              endOfDay.setHours(23, 59, 59, 999);
+              
+              const { data: existingAppointments } = await supabase
+                .from('appointments')
+                .select('date, duration_min')
+                .eq('barber_id', selectedBarber)
+                .neq('status_id', 3)
+                .gte('date', startOfDay.toISOString())
+                .lte('date', endOfDay.toISOString());
+
+              // Verificar disponibilidad para cada slot
+              const selectedServiceObj = services.find(s => s.id === selectedService);
+              const serviceDuration = selectedServiceObj?.duration_min || 30;
+              
+              const slotsWithAvailability: {time: string, available: boolean}[] = [];
+              
+              for (const timeSlot of allSlots) {
+                // Verificar disponibilidad considerando la duración del servicio
+                let isAvailable = true;
+                
+                // Calcular cuántos slots necesita este servicio
+                const slotsNeeded = Math.ceil(serviceDuration / 30);
+                const currentSlotIndex = allSlots.indexOf(timeSlot);
+                
+                // Verificar si este slot y los siguientes están disponibles
+                for (let i = 0; i < slotsNeeded; i++) {
+                  const checkSlotIndex = currentSlotIndex + i;
+                  
+                  // Verificar que no se salga del rango
+                  if (checkSlotIndex >= allSlots.length) {
+                    isAvailable = false;
+                    break;
+                  }
+                  
+                  const checkSlot = allSlots[checkSlotIndex];
+                  
+                  // Verificar si este slot está bloqueado por una excepción de horario
+                  for (const exc of scheduleExceptions || []) {
+                    if (exc.from_time && exc.to_time) {
+                      const excFromMinutes = exc.from_time.split(':').reduce((h, m) => h * 60 + parseInt(m), 0);
+                      const excToMinutes = exc.to_time.split(':').reduce((h, m) => h * 60 + parseInt(m), 0);
+                      const slotMinutes = checkSlot.split(':').reduce((h, m) => h * 60 + parseInt(m), 0);
+                      
+                      if (slotMinutes >= excFromMinutes && slotMinutes < excToMinutes) {
+                        console.log(`[DEBUG] Refresh: Slot ${checkSlot} blocked by modified schedule (${exc.from_time} - ${exc.to_time})`);
+                        isAvailable = false;
+                        break;
+                      }
+                    }
+                  }
+                  
+                  if (!isAvailable) break;
+                  
+                  // Verificar conflictos con citas existentes
+                  for (const apt of existingAppointments || []) {
+                    const existingDate = new Date(apt.date);
+                    
+                    // Extraer solo la fecha de la cita existente para comparar
+                    const existingDateOnly = existingDate.toISOString().split('T')[0];
+                    
+                    // Solo procesar citas del día seleccionado
+                    if (existingDateOnly !== selectedDate) {
+                      continue;
+                    }
+                    
+                    // Formatear la hora de la cita existente usando UTC
+                    const existingHours = existingDate.getUTCHours().toString().padStart(2, '0');
+                    const existingMinutes = existingDate.getUTCMinutes().toString().padStart(2, '0');
+                    const existingTime = `${existingHours}:${existingMinutes}`;
+                    
+                    // Verificar conflicto directo
+                    if (existingTime === checkSlot) {
+                      isAvailable = false;
+                      break;
+                    }
+                    
+                    // Verificar si la cita existente se extiende hacia este slot
+                    const existingDuration = apt.duration_min || 30;
+                    const existingSlotsNeeded = Math.ceil(existingDuration / 30);
+                    const existingSlotIndex = allSlots.indexOf(existingTime);
+                    
+                    if (existingSlotIndex !== -1 && checkSlotIndex >= existingSlotIndex && checkSlotIndex < (existingSlotIndex + existingSlotsNeeded)) {
+                      isAvailable = false;
+                      break;
+                    }
+                  }
+                  
+                  if (!isAvailable) break;
+                }
+                
+                slotsWithAvailability.push({ time: timeSlot, available: isAvailable });
+              }
+              
+              setAllTimeSlots(slotsWithAvailability);
+            }
+          }
+        };
+        
+        refreshAvailability();
+      }
+    } catch (error) {
+      console.error('Error in handleSubmit:', error);
+      setError('Ocurrió un error inesperado. Intenta nuevamente.');
+      setLoading(false);
+    }
   };
 
-  // Obtener barberos de la barbería seleccionada
-  const availableBarbers = selectedBarbershop ? barbersByBarbershop[parseInt(selectedBarbershop) as keyof typeof barbersByBarbershop] || [] : [];
-
-  // Obtener servicios del barbero seleccionado
-  const availableServices = selectedBarber ? servicesByBarber[parseInt(selectedBarber) as keyof typeof servicesByBarber] || [] : [];
-
-  // Obtener horarios del barbero seleccionado
-  const availableTimeSlots = selectedBarber ? timeSlotsByBarber[parseInt(selectedBarber) as keyof typeof timeSlotsByBarber] || [] : [];
 
   // Resetear barbero y servicio seleccionados cuando cambie la barbería
   const handleBarbershopChange = (barbershopId: string) => {
     setSelectedBarbershop(barbershopId);
-    setSelectedBarber(''); // Reset barber selection
-    setSelectedService(''); // Reset service selection
-    setSelectedTime(''); // Reset time selection
+    setSelectedBarber('');
+    setSelectedService('');
+    setSelectedTime('');
   };
 
   // Resetear servicio y tiempo seleccionados cuando cambie el barbero
   const handleBarberChange = (barberId: string) => {
     setSelectedBarber(barberId);
-    setSelectedService(''); // Reset service selection
-    setSelectedTime(''); // Reset time selection
+    setSelectedService('');
+    setSelectedTime('');
+  };
+
+  // Resetear tiempo cuando cambie el servicio
+  const handleServiceChange = (serviceId: string) => {
+    setSelectedService(serviceId);
+    setSelectedTime(''); // Resetear tiempo porque la duración afecta disponibilidad
   };
 
   return (
@@ -220,6 +701,14 @@ export default function BookPage() {
 
       {/* Booking Form */}
       <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 shadow-2xl rounded-2xl sm:rounded-3xl p-4 sm:p-8 lg:p-16 hover:shadow-barbershop-red/10 transition-all duration-700">
+        
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 mb-4">
+            <p className="text-red-200 text-sm">{error}</p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8 lg:space-y-10">
           {/* Barbershop Selection */}
           <div className="space-y-4 sm:space-y-6">
@@ -263,9 +752,9 @@ export default function BookPage() {
                     required
                   >
                     <option value="" className="bg-slate-800 text-gray-300">Selecciona un barbero</option>
-                    {availableBarbers.map((barber) => (
+                    {barbers.map((barber) => (
                       <option key={barber.id} value={barber.id.toString()} className="bg-slate-800 text-white">
-                        {barber.name} - {barber.specialty}
+                        {barber.users?.name || 'Sin nombre'}
                       </option>
                     ))}
                   </select>
@@ -273,7 +762,7 @@ export default function BookPage() {
 
                 {/* Desktop: Button grid */}
                 <div className="hidden md:grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {availableBarbers.map((barber) => (
+                  {barbers.map((barber) => (
                     <button
                       key={barber.id}
                       type="button"
@@ -287,8 +776,7 @@ export default function BookPage() {
                       {selectedBarber === barber.id.toString() && (
                         <div className="absolute top-4 right-4 w-4 h-4 bg-barbershop-blue rounded-full animate-pulse"></div>
                       )}
-                      <h3 className="font-bold text-lg mb-3">{barber.name}</h3>
-                      <p className="text-sm opacity-80">{barber.specialty}</p>
+                      <h3 className="font-bold text-lg mb-3">{barber.users?.name || 'Sin nombre'}</h3>
                     </button>
                   ))}
                 </div>
@@ -313,14 +801,14 @@ export default function BookPage() {
                 <div className="block md:hidden">
                   <select
                     value={selectedService}
-                    onChange={(e) => setSelectedService(e.target.value)}
+                    onChange={(e) => handleServiceChange(e.target.value)}
                     className="w-full px-4 py-3 bg-white/5 border-2 border-white/20 rounded-lg text-white text-base focus:outline-none focus:border-barbershop-red/50 focus:ring-2 focus:ring-barbershop-red/50 transition-all duration-300 backdrop-blur-sm hover:bg-white/10 hover:border-white/30 cursor-pointer"
                     required
                   >
                     <option value="" className="bg-slate-800 text-gray-300">Selecciona un servicio</option>
-                    {availableServices.map((service) => (
-                      <option key={service.id} value={service.id.toString()} className="bg-slate-800 text-white">
-                        {service.name} - {service.duration} - {service.price}
+                    {services.map((service) => (
+                      <option key={service.id} value={service.id} className="bg-slate-800 text-white">
+                        {service.name} {service.duration ? `- ${service.duration}` : ''} {service.price ? `- $${service.price}` : ''}
                       </option>
                     ))}
                   </select>
@@ -328,15 +816,13 @@ export default function BookPage() {
 
                 {/* Desktop: Button grid */}
                 <div className="hidden md:grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {availableServices.map((service) => (
+                  {services.map((service) => (
                     <button
                       key={service.id}
                       type="button"
-                      onClick={() => setSelectedService(service.id.toString())}
+                      onClick={() => handleServiceChange(service.id.toString())}
                       className={`p-6 rounded-xl border-2 transition-all duration-300 text-left relative cursor-pointer backdrop-blur-sm ${
-                        selectedService === service.id.toString()
-                          ? 'border-barbershop-red bg-barbershop-red/20 text-white shadow-lg shadow-barbershop-red/30 scale-105'
-                          : 'border-white/20 bg-white/5 text-gray-300 hover:border-barbershop-red/50 hover:bg-white/10'
+                        selectedService === service.id.toString() ? 'border-barbershop-red bg-barbershop-red/20 text-white shadow-lg shadow-barbershop-red/30 scale-105' : 'border-white/20 bg-white/5 text-gray-300 hover:border-barbershop-red/50 hover:bg-white/10'
                       }`}
                     >
                       {selectedService === service.id.toString() && (
@@ -347,7 +833,7 @@ export default function BookPage() {
                         <span className="text-sm opacity-80">{service.duration}</span>
                         <span className={`font-bold text-lg ${
                           selectedService === service.id.toString() ? 'text-white' : 'text-barbershop-red'
-                        }`}>{service.price}</span>
+                        }`}>{service.price ? `$${service.price}` : ''}</span>
                       </div>
                     </button>
                   ))}
@@ -379,20 +865,59 @@ export default function BookPage() {
                 <Clock className="inline h-5 w-5 sm:h-6 sm:w-6 mr-2 sm:mr-3 text-barbershop-red" />
                 Horario
               </label>
-              {!selectedBarber ? (
+              {!selectedBarber || !selectedService ? (
                 <div className="p-3 sm:p-4 bg-white/5 border border-white/20 rounded-lg sm:rounded-xl text-center">
-                  <p className="text-gray-400 text-xs sm:text-sm italic">Primero selecciona un barbero</p>
+                  <p className="text-gray-400 text-xs sm:text-sm italic">
+                    {!selectedBarber ? 'Primero selecciona un barbero' : 'Selecciona un servicio'}
+                  </p>
+                </div>
+              ) : allTimeSlots.length === 0 && selectedDate ? (
+                <div className="p-3 sm:p-4 bg-red-900/20 border border-red-500/30 rounded-lg sm:rounded-xl text-center">
+                  <p className="text-red-300 text-xs sm:text-sm">
+                    🚫 El barbero no trabaja en la fecha seleccionada
+                  </p>
+                  <p className="text-red-400 text-xs mt-1">
+                    Por favor selecciona otra fecha
+                  </p>
+                </div>
+              ) : allTimeSlots.every(slot => !slot.available) && allTimeSlots.length > 0 ? (
+                <div className="p-3 sm:p-4 bg-yellow-900/20 border border-yellow-500/30 rounded-lg sm:rounded-xl text-center">
+                  <p className="text-yellow-300 text-xs sm:text-sm">
+                    ⏰ Todos los horarios están ocupados para esta fecha
+                  </p>
+                  <p className="text-yellow-400 text-xs mt-1">
+                    Intenta con otra fecha o un servicio más corto
+                  </p>
                 </div>
               ) : (
                 <select
                   value={selectedTime}
-                  onChange={(e) => setSelectedTime(e.target.value)}
+                  onChange={(e) => {
+                    // Solo permitir seleccionar si la opción está disponible
+                    const selectedSlot = allTimeSlots.find(slot => slot.time === e.target.value);
+                    if (selectedSlot && selectedSlot.available) {
+                      setSelectedTime(e.target.value);
+                    }
+                  }}
                   className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-white/5 border-2 border-white/20 rounded-lg sm:rounded-xl text-white text-base sm:text-lg focus:outline-none focus:border-barbershop-red/50 focus:ring-2 focus:ring-barbershop-red/50 transition-all duration-300 backdrop-blur-sm hover:bg-white/10 hover:border-white/30 cursor-pointer"
                   required
                 >
-                  <option value="" className="bg-slate-800 text-gray-300">Selecciona un horario</option>
-                  {availableTimeSlots.map((time) => (
-                    <option key={time} value={time} className="bg-slate-800 text-white">{time}</option>
+                  <option value="" className="bg-slate-800 text-gray-300">
+                    {allTimeSlots.length === 0 ? 'No hay horarios disponibles' : 'Selecciona un horario'}
+                  </option>
+                  {allTimeSlots.map((slot) => (
+                    <option 
+                      key={slot.time} 
+                      value={slot.available ? slot.time : ''} 
+                      disabled={!slot.available}
+                      className={`bg-slate-800 ${
+                        slot.available 
+                          ? 'text-white hover:bg-slate-700' 
+                          : 'text-gray-500 cursor-not-allowed bg-gray-800/50'
+                      }`}
+                    >
+                      {slot.time} {!slot.available ? '(Ocupado)' : ''}
+                    </option>
                   ))}
                 </select>
               )}
@@ -403,7 +928,22 @@ export default function BookPage() {
           <div className="space-y-4 sm:space-y-6 lg:space-y-8">
             <h3 className="text-white text-lg sm:text-xl font-bold">Tus Datos de Contacto</h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
+              <div className="space-y-3 sm:space-y-4">
+                <label className="block text-gray-300 mb-2 sm:mb-3 text-base sm:text-lg font-medium">
+                  <User className="inline h-4 w-4 sm:h-5 sm:w-5 mr-2 text-barbershop-red" />
+                  Nombre Completo
+                </label>
+                <input
+                  type="text"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="Juan Pérez"
+                  className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-white/5 border-2 border-white/20 rounded-lg sm:rounded-xl text-white placeholder-gray-400 text-base sm:text-lg focus:outline-none focus:border-barbershop-red/50 focus:ring-2 focus:ring-barbershop-red/50 transition-all duration-300 backdrop-blur-sm hover:bg-white/10 hover:border-white/30"
+                  required
+                />
+              </div>
+
               <div className="space-y-3 sm:space-y-4">
                 <label className="block text-gray-300 mb-2 sm:mb-3 text-base sm:text-lg font-medium">
                   <Mail className="inline h-4 w-4 sm:h-5 sm:w-5 mr-2 text-barbershop-red" />
@@ -441,10 +981,19 @@ export default function BookPage() {
           {/* Submit Button */}
           <button
             type="submit"
-            className="w-full bg-gradient-to-r from-barbershop-red via-red-600 to-barbershop-red text-white py-4 sm:py-5 px-6 sm:px-8 rounded-lg sm:rounded-xl font-bold text-lg sm:text-xl hover:scale-105 transition-all duration-500 shadow-xl shadow-barbershop-red/30 hover:shadow-barbershop-red/50 group overflow-hidden relative cursor-pointer"
+            disabled={loading}
+            className={`w-full py-4 sm:py-5 px-6 sm:px-8 rounded-lg sm:rounded-xl font-bold text-lg sm:text-xl transition-all duration-500 shadow-xl group overflow-hidden relative cursor-pointer ${
+              loading 
+                ? 'bg-gray-600 cursor-not-allowed' 
+                : 'bg-gradient-to-r from-barbershop-red via-red-600 to-barbershop-red text-white hover:scale-105 shadow-barbershop-red/30 hover:shadow-barbershop-red/50'
+            }`}
           >
-            <span className="relative z-10">🎯 Confirmar Turno</span>
-            <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+            <span className="relative z-10">
+              {loading ? '⏳ Agendando...' : '🎯 Confirmar Turno'}
+            </span>
+            {!loading && (
+              <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+            )}
           </button>
         </form>
       </div>

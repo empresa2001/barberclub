@@ -9,6 +9,44 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      schedule_exceptions: {
+        Row: {
+          id: string;
+          barber_id: string;
+          date: string; // YYYY-MM-DD
+          from_time: string | null; // puede ser null si es bloqueo total
+          to_time: string | null;   // puede ser null si es bloqueo total
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          barber_id: string;
+          date: string;
+          from_time?: string | null;
+          to_time?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          barber_id?: string;
+          date?: string;
+          from_time?: string | null;
+          to_time?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "schedule_exceptions_barber_id_fkey",
+            columns: ["barber_id"],
+            isOneToOne: false,
+            referencedRelation: "barbers",
+            referencedColumns: ["id"]
+          }
+        ];
+      },
       user_types: {
         Row: {
           id: number
@@ -102,7 +140,7 @@ export interface Database {
             referencedRelation: "barbers"
             referencedColumns: ["id"]
           }
-        ]
+        ],
       }
       barbershops: {
         Row: {
@@ -374,6 +412,7 @@ export type Barber = Database['public']['Tables']['barbers']['Row']
 export type Schedule = Database['public']['Tables']['schedules']['Row']
 export type Service = Database['public']['Tables']['services']['Row']
 export type Appointment = Database['public']['Tables']['appointments']['Row']
+export type ScheduleException = Database['public']['Tables']['schedule_exceptions']['Row']
 
 // Insert types
 export type UserInsert = Database['public']['Tables']['users']['Insert']
@@ -382,6 +421,7 @@ export type BarberInsert = Database['public']['Tables']['barbers']['Insert']
 export type ScheduleInsert = Database['public']['Tables']['schedules']['Insert']
 export type ServiceInsert = Database['public']['Tables']['services']['Insert']
 export type AppointmentInsert = Database['public']['Tables']['appointments']['Insert']
+export type ScheduleExceptionInsert = Database['public']['Tables']['schedule_exceptions']['Insert']
 
 // Update types
 export type UserUpdate = Database['public']['Tables']['users']['Update']
@@ -390,6 +430,7 @@ export type BarberUpdate = Database['public']['Tables']['barbers']['Update']
 export type ScheduleUpdate = Database['public']['Tables']['schedules']['Update']
 export type ServiceUpdate = Database['public']['Tables']['services']['Update']
 export type AppointmentUpdate = Database['public']['Tables']['appointments']['Update']
+export type ScheduleExceptionUpdate = Database['public']['Tables']['schedule_exceptions']['Update']
 
 // View types
 export type BarberDetails = Database['public']['Views']['barber_details']['Row']
