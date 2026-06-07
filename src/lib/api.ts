@@ -283,7 +283,7 @@ export const appointmentsApi = {
         *,
         services(name, price),
         appointment_status(name),
-        barbers(*, users(name))
+        barbers(*, users!barbers_user_id_fkey(name))
       `)
       .eq('id', id)
       .single()

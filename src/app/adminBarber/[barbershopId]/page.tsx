@@ -61,7 +61,7 @@ export default function AdminBarberPage() {
       // 2. Obtener barberos
       const { data, error } = await supabase
         .from("barbers")
-        .select("id, user_id, users(name, email, is_active)")
+        .select("id, user_id, users!barbers_user_id_fkey(name, email, is_active)")
         .eq("barbershop_id", barbershopId);
       if (error) {
         setError("Error al cargar los peluqueros");
@@ -155,7 +155,7 @@ export default function AdminBarberPage() {
       setLoading(true);
       const { data } = await supabase
         .from("barbers")
-        .select("id, user_id, users(name, email)")
+        .select("id, user_id, users!barbers_user_id_fkey(name, email)")
         .eq("barbershop_id", barbershopId);
       setBarbers(
         (data || []).map((b: any) => ({

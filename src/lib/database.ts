@@ -311,7 +311,7 @@ export const appointmentService = {
       .from('appointments')
       .select(`
         *,
-        barbers(*, users(name)),
+        barbers(*, users!barbers_user_id_fkey(name)),
         services(name, price),
         appointment_status(name)
       `)

@@ -19,7 +19,6 @@ import Logo from "@/components/Logo";
 import { authApi, barbershopsApi, barbersApi } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { Toaster } from "react-hot-toast";
 import toast from "react-hot-toast";
 
 interface FormData {
@@ -181,7 +180,6 @@ const handleSubmit = async (e: React.FormEvent) => {
           </div>
 
           
-            <Toaster position="top-right" /> 
 
           {/* Progress Indicator */}
           <div className="mb-8 sm:mb-12">
