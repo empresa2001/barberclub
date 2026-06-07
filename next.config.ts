@@ -6,6 +6,11 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  // Elimina console.* en produccion (conserva console.error) para no filtrar
+  // datos de clientes ni ruido de debug en los logs del browser.
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' ? { exclude: ['error'] } : false,
+  },
   // PWA Configuration
   headers: async () => {
     return [

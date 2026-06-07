@@ -294,6 +294,24 @@ export default function BookPage() {
         return;
       }
 
+      // Validar formato de email
+      const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim());
+      if (!emailOk) {
+        const msg = 'Ingresá un email válido.';
+        setError(msg); toast.error(msg); setLoading(false);
+        return;
+      }
+
+      // Validar teléfono (si se completó): 8 a 15 digitos, permite +, espacios y guiones
+      if (customerPhone && customerPhone.trim()) {
+        const digits = customerPhone.replace(/[^\d]/g, '');
+        if (digits.length < 8 || digits.length > 15) {
+          const msg = 'Ingresá un teléfono válido (8 a 15 dígitos).';
+          setError(msg); toast.error(msg); setLoading(false);
+          return;
+        }
+      }
+
       // Verificar que el horario seleccionado esté disponible
       const selectedSlot = allTimeSlots.find(slot => slot.time === selectedTime);
       if (!selectedSlot || !selectedSlot.available) {
