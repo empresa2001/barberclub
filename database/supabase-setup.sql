@@ -377,7 +377,7 @@ CREATE POLICY "Delete exceptions of own barbers" ON schedule_exceptions
 
 -- appointments (cualquiera puede crear un turno; gestion para dueños/barberos)
 CREATE POLICY "Anyone can create appointments" ON appointments
-    FOR INSERT WITH CHECK (true);
+    FOR INSERT TO anon, authenticated WITH CHECK (true);
 CREATE POLICY "Barbers and owners can view appointments" ON appointments
     FOR SELECT USING (public.can_manage_barber(barber_id) OR public.is_superadmin());
 CREATE POLICY "Manage appointments of own barbers" ON appointments
