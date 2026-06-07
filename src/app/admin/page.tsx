@@ -31,7 +31,7 @@ import Link from 'next/link';
 import { barbershopsApi } from '@/lib/api';
 import { lookupService } from '@/lib/database';
 import { ConfirmModal } from '@/components/ui';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 
@@ -767,35 +767,6 @@ export default function AdminDashboard() {
         isLoading={loadingStates[confirmModal.barbershopId] || false}
       />
 
-      {/* Toast notifications */}
-      <Toaster
-        position="top-right"
-        reverseOrder={false}
-        gutter={8}
-        containerClassName=""
-        containerStyle={{}}
-        toastOptions={{
-          className: '',
-          duration: 4000,
-          style: {
-            borderRadius: '12px',
-            fontWeight: '500',
-            fontFamily: 'system-ui, -apple-system, sans-serif',
-          },
-          success: {
-            iconTheme: {
-              primary: '#10b981',
-              secondary: '#ffffff',
-            },
-          },
-          error: {
-            iconTheme: {
-              primary: '#ef4444',
-              secondary: '#ffffff',
-            },
-          },
-        }}
-      />
     </div>
   );
 }

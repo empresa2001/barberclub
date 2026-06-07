@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { CheckCircle, XCircle, Loader, ArrowRight } from 'lucide-react';
 import Logo from '@/components/Logo';
 import Link from 'next/link';
 
-export default function AuthCallbackPage() {
+// Estas paginas dependen de la URL (?code=...), no tiene sentido prerenderizarlas.
+export const dynamic = 'force-dynamic';
+
+function AuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -19,8 +22,8 @@ export default function AuthCallbackPage() {
         console.log('🔄 Iniciando manejo de callback...');
         
         // Obtener el código de la URL
-        const code = searchParams.get('code');
-        const error = searchParams.get('error');
+        const code = searchParams?.get('code') ?? null;
+        const error = searchParams?.get('error') ?? null;
         
         console.log('📧 Código presente:', code ? 'sí' : 'no');
         console.log('❌ Error en URL:', error);
@@ -186,5 +189,13 @@ export default function AuthCallbackPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense fallback={null}>
+      <AuthCallbackContent />
+    </Suspense>
   );
 }

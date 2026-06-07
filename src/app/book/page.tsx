@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import toast from 'react-hot-toast';
 
 export default function BookPage() {
 
@@ -51,7 +52,7 @@ export default function BookPage() {
       // Si no existe la relación barbers_user_id_fkey, usar users(user_id)
       const { data, error } = await supabase
         .from('barbers')
-        .select('id, user_id, users(name, email)')
+        .select('id, user_id, users!barbers_user_id_fkey(name, email)')
         .eq('barbershop_id', selectedBarbershop);
       if (!error && data) setBarbers(data);
     };
@@ -153,13 +154,13 @@ export default function BookPage() {
       console.log(`[DEBUG] Fetching appointments for barber ${selectedBarber} on ${selectedDate}`);
       console.log(`[DEBUG] Date range: ${startOfDay.toISOString()} to ${endOfDay.toISOString()}`);
       
-      const { data: existingAppointments } = await supabase
-        .from('appointments')
-        .select('date, duration_min')
-        .eq('barber_id', selectedBarber)
-        .neq('status_id', 3) // Excluir canceladas
-        .gte('date', startOfDay.toISOString())
-        .lte('date', endOfDay.toISOString());
+      // RPC publica: devuelve rangos ocupados sin exponer datos del cliente.
+      // (la lectura directa de appointments esta bloqueada por RLS para anonimos)
+      const { data: existingAppointments } = await supabase.rpc('get_busy_slots', {
+        p_barber_id: selectedBarber,
+        p_from: startOfDay.toISOString(),
+        p_to: endOfDay.toISOString(),
+      });
 
       console.log('[DEBUG] Existing appointments found:', existingAppointments);
 
@@ -352,13 +353,11 @@ export default function BookPage() {
         }
       }
       
-      const { data: existingAppointments, error: checkError } = await supabase
-        .from('appointments')
-        .select('date, duration_min')
-        .eq('barber_id', selectedBarber)
-        .neq('status_id', 3) // Excluir canceladas
-        .gte('date', startOfDay.toISOString())
-        .lte('date', endOfDay.toISOString());
+      const { data: existingAppointments, error: checkError } = await supabase.rpc('get_busy_slots', {
+        p_barber_id: selectedBarber,
+        p_from: startOfDay.toISOString(),
+        p_to: endOfDay.toISOString(),
+      });
 
       if (checkError) {
         console.error('Error checking availability:', checkError);
@@ -481,10 +480,18 @@ export default function BookPage() {
 
       if (error) {
         console.error('Error creating appointment:', error);
-        setError('Ocurrió un error al agendar el turno. Intenta nuevamente.');
+        // 23P01 = exclusion_violation: el horario fue tomado por otra reserva (race condition)
+        if (error.code === '23P01') {
+          const msg = 'Ese horario acaba de ser reservado por otra persona. Por favor elegí otro.';
+          setError(msg);
+          toast.error(msg);
+        } else {
+          setError('Ocurrió un error al agendar el turno. Intenta nuevamente.');
+          toast.error('Ocurrió un error al agendar el turno. Intenta nuevamente.');
+        }
       } else {
-        alert(`¡Turno agendado exitosamente para ${selectedDate} a las ${selectedTime}! Te enviaremos la confirmación por email.`);
-        
+        toast.success(`¡Turno agendado para el ${selectedDate} a las ${selectedTime}! Te enviaremos la confirmación por email.`, { duration: 6000 });
+
         // Resetear formulario
         setSelectedBarbershop('');
         setSelectedBarber('');

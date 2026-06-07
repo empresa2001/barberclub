@@ -391,7 +391,17 @@ export interface Database {
       }
     }
     Functions: {
-      [_ in never]: never
+      get_busy_slots: {
+        Args: {
+          p_barber_id: string
+          p_from: string
+          p_to: string
+        }
+        Returns: {
+          date: string
+          duration_min: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

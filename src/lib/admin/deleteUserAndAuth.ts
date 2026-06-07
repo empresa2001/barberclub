@@ -1,23 +1,27 @@
 import { supabase } from '@/lib/supabase';
-import { deleteUserFromAuth } from './deleteUserFromAuth';
 
 /**
- * Elimina un usuario de barbers, users y Supabase Auth.
- * Lanza error si alguna operación falla.
+ * Elimina un usuario (barbero) llamando al API route server-only,
+ * que valida permisos y usa la service_role key del lado del servidor.
+ * Nunca expone la service_role key al browser.
  */
 export async function deleteUserAndAuth(user_id: string, barber_id?: string) {
-  // 1. Eliminar de barbers (si se provee barber_id)
-  if (barber_id) {
-    const { error: barberDeleteError } = await supabase.from('barbers').delete().eq('id', barber_id);
-    if (barberDeleteError) throw new Error('No se pudo eliminar el barbero');
-  } else {
-    // Si no se provee barber_id, eliminar todos los barbers de ese user
-    const { error: barberDeleteError } = await supabase.from('barbers').delete().eq('user_id', user_id);
-    if (barberDeleteError) throw new Error('No se pudo eliminar el barbero');
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) throw new Error('No hay sesion activa');
+
+  const res = await fetch('/api/admin/delete-user', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ user_id, barber_id }),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'No se pudo eliminar el usuario');
   }
-  // 2. Eliminar de users
-  const { error: userDeleteError } = await supabase.from('users').delete().eq('id', user_id);
-  if (userDeleteError) throw new Error('No se pudo eliminar el usuario asociado');
-  // 3. Eliminar de Supabase Auth
-  await deleteUserFromAuth(user_id);
+  return true;
 }

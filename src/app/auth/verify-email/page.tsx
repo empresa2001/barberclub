@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { Mail, ArrowLeft, RefreshCw, CheckCircle, Clock } from "lucide-react";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import { authApi } from "@/lib/api";
 import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
-import { Toaster } from "react-hot-toast";
 import { supabase } from "@/lib/supabase";
 
-export default function VerifyEmailPage() {
+export const dynamic = 'force-dynamic';
+
+function VerifyEmailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isResending, setIsResending] = useState(false);
@@ -18,7 +19,7 @@ export default function VerifyEmailPage() {
 
   // Manejar errores del callback
   useEffect(() => {
-    const error = searchParams.get('error');
+    const error = searchParams?.get('error') ?? null;
     if (error) {
       console.log('❌ Error recibido en verify-email:', error);
       let errorMessage = '';
@@ -92,8 +93,6 @@ export default function VerifyEmailPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-gray-950 to-slate-900 relative overflow-hidden">
-      <Toaster position="top-right" />
-      
       {/* Sophisticated Background Elements */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-gradient-to-br from-barbershop-blue/8 via-blue-600/4 to-transparent rounded-full blur-3xl animate-pulse"></div>
@@ -207,5 +206,13 @@ export default function VerifyEmailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={null}>
+      <VerifyEmailContent />
+    </Suspense>
   );
 }
