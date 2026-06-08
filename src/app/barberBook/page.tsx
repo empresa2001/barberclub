@@ -1,504 +1,500 @@
-"use client"
+"use client";
+
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { schedulesApi, appointmentsApi } from "@/lib/api";
-import { Card, Button, Input } from "@/components/ui";
+import { supabase } from "@/lib/supabase";
+import { CalendarDays, Clock, Ban, Plus, Trash2, Save, CheckCircle } from "lucide-react";
+import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import toast from "react-hot-toast";
 
-// Días de la semana
-const DAYS = [
-  "Lunes",
-  "Martes",
-  "Miércoles",
-  "Jueves",
-  "Viernes",
-  "Sábado",
-  "Domingo",
-];
+// ─── Types ────────────────────────────────────────────────────────────────────
 
+const DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
-type Interval = {
-  from: string; // "10:00"
-  to: string;   // "18:00"
-};
+type Interval = { from: string; to: string };
+type ScheduleUI = { day: string; intervals: Interval[] };
+type ExceptionUI = { id: string; date: string; intervals: Interval[] };
+type Tab = "appointments" | "schedules" | "exceptions";
 
-type ScheduleUI = {
-  day: string;
-  intervals: Interval[];
-};
-
-type ExceptionUI = {
-  id: string;
-  date: string; // YYYY-MM-DD
-  intervals: Interval[]; // Si está vacío, el día está bloqueado
-};
-
-// Helper para mostrar el estado textual si appointment_status es null
-function getStatusText(statusId: number) {
-  if (statusId === 1) return 'Pendiente';
-  if (statusId === 2) return 'Confirmado';
-  if (statusId === 3) return 'Cancelado';
-  if (statusId === 4) return 'Completado';
-  return 'Desconocido';
+function getStatusLabel(id: number) {
+  return { 1: "Pendiente", 2: "Confirmado", 3: "Cancelado", 4: "Completado" }[id] ?? "Desconocido";
 }
-export default function BarberBookPage() {
+function getStatusColor(id: number) {
+  return { 1: "bg-yellow-500/15 text-yellow-300 border-yellow-500/20",
+           2: "bg-[#2e4a7d]/20 text-blue-300 border-[#2e4a7d]/30",
+           3: "bg-red-500/15 text-red-300 border-red-500/20",
+           4: "bg-emerald-500/15 text-emerald-300 border-emerald-500/20" }[id]
+    ?? "bg-white/5 text-gray-400 border-white/10";
+}
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function BarberBookPage() {
   const { user, loading: authLoading } = useAuth();
   const [barberId, setBarberId] = useState<string | null>(null);
-  const [schedules, setSchedules] = useState<ScheduleUI[]>(DAYS.map((day) => ({ day, intervals: [] })));
-  const [selectedDay, setSelectedDay] = useState<string>(DAYS[0]);
+  const [activeTab, setActiveTab] = useState<Tab>("appointments");
+  const [loading, setLoading] = useState(true);
+
+  // Appointment state
+  const [appointments, setAppointments] = useState<any[]>([]);
+
+  // Schedule state
+  const [schedules, setSchedules] = useState<ScheduleUI[]>(
+    DAYS.map((day) => ({ day, intervals: [] }))
+  );
+  const [selectedDay, setSelectedDay] = useState(DAYS[0]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [appointments, setAppointments] = useState<any[]>([]);
-  // Excepciones de horario (bloqueos o cambios para días específicos)
-  const [exceptions, setExceptions] = useState<ExceptionUI[]>([]);
-  const [exceptionDate, setExceptionDate] = useState("");
-  const [exceptionFrom, setExceptionFrom] = useState("");
-  const [exceptionTo, setExceptionTo] = useState("");
-  const [exceptionIntervals, setExceptionIntervals] = useState<Interval[]>([]);
-  const [savingException, setSavingException] = useState(false);
 
-  // Obtener barber_id del usuario logueado
+  // Exception state
+  const [exceptions, setExceptions] = useState<ExceptionUI[]>([]);
+  const [excDate, setExcDate] = useState("");
+  const [excFrom, setExcFrom] = useState("");
+  const [excTo, setExcTo] = useState("");
+  const [excIntervals, setExcIntervals] = useState<Interval[]>([]);
+  const [savingExc, setSavingExc] = useState(false);
+
+  // ── Resolve barber ID ──────────────────────────────────────────────────────
   useEffect(() => {
-    const fetchBarberId = async () => {
-      if (!user) return;
-      // Buscar barber_id en la tabla users
-      const { data, error } = await (await import("@/lib/supabase")).supabase
-        .from("users")
-        .select("barber_id")
-        .eq("id", user.id)
-        .single();
-      if (data?.barber_id) setBarberId(data.barber_id);
-    };
-    fetchBarberId();
+    if (!user) return;
+    supabase.from("users").select("barber_id").eq("id", user.id).single()
+      .then(({ data }) => { if (data?.barber_id) setBarberId(data.barber_id); });
   }, [user]);
 
-  // Cargar horarios, turnos y excepciones del barbero
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!barberId) return;
-      setLoading(true);
+  // ── Fetch all data ─────────────────────────────────────────────────────────
+  const fetchData = useCallback(async () => {
+    if (!barberId) return;
+    setLoading(true);
 
-      // 1. Horarios
-      const dbSchedules = await schedulesApi.getByBarber(barberId);
+    // Appointments
+    const dbApts = await appointmentsApi.getByBarber(barberId, 60);
+    setAppointments(dbApts || []);
 
-      // Agrupar por día
-      const grouped: Record<string, Interval[]> = {};
-      for (const s of dbSchedules) {
-        const day = DAYS[s.day_of_week ?? 0] || DAYS[0];
-        if (!grouped[day]) grouped[day] = [];
-        grouped[day].push({ from: s.from_time, to: s.to_time });
-      }
-      setSchedules(DAYS.map((day, i) => ({ day, intervals: grouped[day] || [] })));
-
-      // 2. Excepciones
-      const { data: dbExceptions, error: exError } = await (await import("@/lib/supabase")).supabase
-        .from("schedule_exceptions")
-        .select("id,date,from_time,to_time")
-        .eq("barber_id", barberId)
-        .order("date", { ascending: true });
-      // Agrupar excepciones por fecha
-      const groupedExceptions: Record<string, Interval[]> = {};
-      if (dbExceptions) {
-        for (const ex of dbExceptions) {
-          if (!groupedExceptions[ex.date]) groupedExceptions[ex.date] = [];
-          if (ex.from_time && ex.to_time) {
-            groupedExceptions[ex.date].push({ from: ex.from_time, to: ex.to_time });
-          }
-        }
-      }
-      setExceptions(
-        dbExceptions
-          ? Array.from(new Set(dbExceptions.map((e: any) => e.date))).map((date) => ({
-              id: dbExceptions.find((e: any) => e.date === date)?.id ?? "",
-              date,
-              intervals: groupedExceptions[date],
-            }))
-          : []
-      );
-
-      // 3. Turnos
-      const dbAppointments = await appointmentsApi.getByBarber(barberId, 30);
-      setAppointments(dbAppointments || []);
-      setLoading(false);
-    };
-    if (barberId) fetchData();
-  }, [barberId]);
-  // Agregar intervalo a la excepción (UI)
-  const handleAddExceptionInterval = () => {
-    if (!exceptionFrom || !exceptionTo) return;
-    setExceptionIntervals((prev) => [...prev, { from: exceptionFrom, to: exceptionTo }]);
-    setExceptionFrom("");
-    setExceptionTo("");
-  };
-
-  // Eliminar intervalo de excepción (UI)
-  const handleDeleteExceptionInterval = (idx: number) => {
-    setExceptionIntervals((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  // Guardar excepción (bloquear día o definir horario especial)
-  const handleSaveException = async () => {
-    if (!barberId || !exceptionDate) return;
-    setSavingException(true);
-    // 1. Borrar excepciones existentes para ese día/barbero
-    await (await import("@/lib/supabase")).supabase
-      .from("schedule_exceptions")
-      .delete()
-      .eq("barber_id", barberId)
-      .eq("date", exceptionDate);
-    // 2. Insertar nuevas excepciones (si intervals vacío, es bloqueo total)
-    if (exceptionIntervals.length > 0) {
-      const inserts = exceptionIntervals.map((interval) => ({
-        barber_id: barberId,
-        date: exceptionDate,
-        from_time: interval.from,
-        to_time: interval.to,
-      }));
-      await (await import("@/lib/supabase")).supabase
-        .from("schedule_exceptions")
-        .insert(inserts);
-    } else {
-      // Insertar un registro vacío para bloquear todo el día
-      await (await import("@/lib/supabase")).supabase
-        .from("schedule_exceptions")
-        .insert({ barber_id: barberId, date: exceptionDate });
+    // Schedules
+    const dbSch = await schedulesApi.getByBarber(barberId);
+    const grouped: Record<string, Interval[]> = {};
+    for (const s of dbSch) {
+      const day = DAYS[s.day_of_week ?? 0] || DAYS[0];
+      if (!grouped[day]) grouped[day] = [];
+      grouped[day].push({ from: s.from_time, to: s.to_time });
     }
-    setExceptionDate("");
-    setExceptionIntervals([]);
-    setSavingException(false);
-    // Refrescar excepciones
-    const { data: dbExceptions } = await (await import("@/lib/supabase")).supabase
+    setSchedules(DAYS.map((day) => ({ day, intervals: grouped[day] || [] })));
+
+    // Exceptions
+    await refreshExceptions(barberId);
+
+    setLoading(false);
+  }, [barberId]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const refreshExceptions = async (bid: string) => {
+    const { data } = await supabase
       .from("schedule_exceptions")
       .select("id,date,from_time,to_time")
-      .eq("barber_id", barberId)
+      .eq("barber_id", bid)
       .order("date", { ascending: true });
-    // Agrupar excepciones por fecha
-    const groupedExceptions: Record<string, Interval[]> = {};
-    if (dbExceptions) {
-      for (const ex of dbExceptions) {
-        if (!groupedExceptions[ex.date]) groupedExceptions[ex.date] = [];
-        if (ex.from_time && ex.to_time) {
-          groupedExceptions[ex.date].push({ from: ex.from_time, to: ex.to_time });
-        }
-      }
+
+    if (!data) return;
+    const grouped: Record<string, Interval[]> = {};
+    for (const ex of data) {
+      if (!grouped[ex.date]) grouped[ex.date] = [];
+      if (ex.from_time && ex.to_time) grouped[ex.date].push({ from: ex.from_time, to: ex.to_time });
     }
-    setExceptions(
-      dbExceptions
-        ? Array.from(new Set(dbExceptions.map((e: any) => e.date))).map((date) => ({
-            id: dbExceptions.find((e: any) => e.date === date)?.id ?? "",
-            date,
-            intervals: groupedExceptions[date],
-          }))
-        : []
-    );
+    const dates = Array.from(new Set(data.map((e: any) => e.date))) as string[];
+    setExceptions(dates.map((date) => ({
+      id: data.find((e: any) => e.date === date)?.id ?? "",
+      date,
+      intervals: grouped[date] ?? [],
+    })));
   };
 
-  // Eliminar excepción
-  const handleDeleteException = async (date: string) => {
-    if (!barberId) return;
-    await (await import("@/lib/supabase")).supabase
-      .from("schedule_exceptions")
-      .delete()
-      .eq("barber_id", barberId)
-      .eq("date", date);
-    setExceptions((prev) => prev.filter((e) => e.date !== date));
-  };
-
-  // Agregar intervalo (solo en UI)
+  // ── Schedule handlers ──────────────────────────────────────────────────────
   const handleAddInterval = () => {
     if (!from || !to) return;
     setSchedules((prev) =>
-      prev.map((s) =>
-        s.day === selectedDay
-          ? { ...s, intervals: [...s.intervals, { from, to }] }
-          : s
-      )
+      prev.map((s) => s.day === selectedDay ? { ...s, intervals: [...s.intervals, { from, to }] } : s)
     );
-    setFrom("");
-    setTo("");
+    setFrom(""); setTo("");
   };
 
-  // Eliminar intervalo (solo en UI)
   const handleDeleteInterval = (day: string, idx: number) => {
     setSchedules((prev) =>
-      prev.map((s) =>
-        s.day === day
-          ? { ...s, intervals: s.intervals.filter((_, i) => i !== idx) }
-          : s
-      )
+      prev.map((s) => s.day === day ? { ...s, intervals: s.intervals.filter((_, i) => i !== idx) } : s)
     );
   };
 
-  // Guardar horarios en Supabase
   const handleSaveSchedules = async () => {
     if (!barberId) return;
     setSaving(true);
-    // 1. Borrar todos los horarios actuales del barbero
-    const { error: delError } = await (await import("@/lib/supabase")).supabase
-      .from("schedules")
-      .delete()
-      .eq("barber_id", barberId);
-    if (delError) {
-      setSaving(false);
-      alert("Error al borrar horarios antiguos");
-      return;
-    }
-    // 2. Insertar los nuevos
-    const inserts = [];
-    for (let i = 0; i < schedules.length; i++) {
-      const day = schedules[i].day;
-      const dayIdx = DAYS.indexOf(day);
-      for (const interval of schedules[i].intervals) {
-        inserts.push({
-          barber_id: barberId,
-          day_of_week: dayIdx,
-          from_time: interval.from,
-          to_time: interval.to,
-        });
-      }
-    }
+    const { error: delErr } = await supabase.from("schedules").delete().eq("barber_id", barberId);
+    if (delErr) { toast.error("Error al guardar horarios"); setSaving(false); return; }
+
+    const inserts = schedules.flatMap((s, dayIdx) =>
+      s.intervals.map((iv) => ({
+        barber_id: barberId,
+        day_of_week: DAYS.indexOf(s.day),
+        from_time: iv.from,
+        to_time: iv.to,
+      }))
+    );
     if (inserts.length > 0) {
-      const { error: insError } = await (await import("@/lib/supabase")).supabase
-        .from("schedules")
-        .insert(inserts);
-      if (insError) {
-        setSaving(false);
-        alert("Error al guardar horarios nuevos");
-        return;
-      }
+      const { error } = await supabase.from("schedules").insert(inserts);
+      if (error) { toast.error("Error al guardar horarios"); setSaving(false); return; }
     }
     setSaving(false);
-    alert("Horarios guardados correctamente");
+    toast.success("Horarios guardados");
   };
 
+  // ── Exception handlers ─────────────────────────────────────────────────────
+  const handleAddExcInterval = () => {
+    if (!excFrom || !excTo) return;
+    setExcIntervals((p) => [...p, { from: excFrom, to: excTo }]);
+    setExcFrom(""); setExcTo("");
+  };
+
+  const handleSaveException = async () => {
+    if (!barberId || !excDate) return;
+    setSavingExc(true);
+    await supabase.from("schedule_exceptions").delete().eq("barber_id", barberId).eq("date", excDate);
+    if (excIntervals.length > 0) {
+      await supabase.from("schedule_exceptions").insert(
+        excIntervals.map((iv) => ({ barber_id: barberId, date: excDate, from_time: iv.from, to_time: iv.to }))
+      );
+    } else {
+      await supabase.from("schedule_exceptions").insert({ barber_id: barberId, date: excDate });
+    }
+    setExcDate(""); setExcIntervals([]);
+    await refreshExceptions(barberId);
+    setSavingExc(false);
+    toast.success(excIntervals.length === 0 ? "Día bloqueado" : "Excepción guardada");
+  };
+
+  const handleDeleteException = async (date: string) => {
+    if (!barberId) return;
+    await supabase.from("schedule_exceptions").delete().eq("barber_id", barberId).eq("date", date);
+    setExceptions((p) => p.filter((e) => e.date !== date));
+    toast.success("Excepción eliminada");
+  };
+
+  // ── Tabs ───────────────────────────────────────────────────────────────────
+  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: "appointments", label: "Mis turnos",   icon: <CalendarDays className="w-4 h-4" /> },
+    { id: "schedules",    label: "Mis horarios",  icon: <Clock className="w-4 h-4" /> },
+    { id: "exceptions",   label: "Excepciones",  icon: <Ban className="w-4 h-4" /> },
+  ];
+
+  const today = new Date().toISOString().split("T")[0];
+  const upcomingApts = appointments.filter((a) => a.date >= today && a.status_id !== 3);
+  const pastApts = appointments.filter((a) => a.date < today || a.status_id === 3);
+
   return (
-    <>
+    <div className="min-h-screen bg-[#1a1a1a] flex flex-col">
       <Navbar />
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-gray-950 to-slate-900 relative overflow-hidden">
-        {/* Animated Background Elements */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-20 left-10 w-96 h-96 bg-red-500/10 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-20 right-10 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
-          <div className="absolute top-1/2 left-1/3 w-72 h-72 bg-purple-500/5 rounded-full blur-3xl animate-pulse" style={{animationDelay: '4s'}}></div>
-          <div className="absolute top-10 right-1/4 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl animate-pulse" style={{animationDelay: '6s'}}></div>
+
+      <main className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 py-8">
+
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-white">Mi agenda</h1>
+          <p className="text-gray-500 text-sm mt-0.5">Gestión de turnos y horarios</p>
         </div>
-        <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
-          <header className="mb-10 text-center">
-            <h1 className="text-3xl font-bold text-white drop-shadow-lg mb-2">Gestión de horarios</h1>
-            <p className="text-white/70 font-medium">Configura tus días y turnos de atención</p>
-          </header>
-          {authLoading || loading ? (
-            <div className="flex justify-center py-8"><span className="text-gray-400">Cargando...</span></div>
-          ) : (
-            <>
-              <Card className="mb-10 bg-gradient-to-br from-white/10 to-white/5 border border-white/20 shadow-2xl">
-                <h2 className="text-xl font-bold text-white mb-4">Agregar intervalo</h2>
-                <div className="flex flex-col md:flex-row gap-2 items-center justify-center mb-4">
-                  <select
-                    className="border border-gray-700 rounded-lg px-4 py-3 bg-barbershop-black text-barbershop-white focus:ring-2 focus:ring-barbershop-blue"
-                    value={selectedDay}
-                    onChange={(e) => setSelectedDay(e.target.value)}
-                  >
-                    {DAYS.map((day) => (
-                      <option key={day} value={day}>{day}</option>
-                    ))}
-                  </select>
-                  <Input
-                    type="time"
-                    className="w-32"
-                    value={from}
-                    onChange={(e) => setFrom(e.target.value)}
-                  />
-                  <span className="text-gray-400">-</span>
-                  <Input
-                    type="time"
-                    className="w-32"
-                    value={to}
-                    onChange={(e) => setTo(e.target.value)}
-                  />
-                  <Button
-                    variant="secondary"
-                    size="md"
-                    onClick={handleAddInterval}
-                  >
-                    Agregar
-                  </Button>
-                </div>
-                <Button
-                  variant="primary"
-                  size="md"
-                  className="mt-2"
-                  onClick={handleSaveSchedules}
-                  loading={saving}
-                  disabled={saving}
-                >
-                  Guardar horarios
-                </Button>
-              </Card>
 
-              {/* Excepciones de horario */}
-              <Card className="mb-10 bg-gradient-to-br from-white/10 to-white/5 border border-white/20 shadow-2xl">
-                <h2 className="text-xl font-bold text-white mb-4">Excepciones (bloquear/cambiar horario de un día específico)</h2>
-                <div className="flex flex-col md:flex-row gap-2 items-center justify-center mb-4">
-                  <Input
-                    type="date"
-                    className="w-40"
-                    value={exceptionDate}
-                    onChange={(e) => setExceptionDate(e.target.value)}
-                  />
-                  <Input
-                    type="time"
-                    className="w-32"
-                    value={exceptionFrom}
-                    onChange={(e) => setExceptionFrom(e.target.value)}
-                    placeholder="Desde"
-                  />
-                  <span className="text-gray-400">-</span>
-                  <Input
-                    type="time"
-                    className="w-32"
-                    value={exceptionTo}
-                    onChange={(e) => setExceptionTo(e.target.value)}
-                    placeholder="Hasta"
-                  />
-                  <Button
-                    variant="secondary"
-                    size="md"
-                    onClick={handleAddExceptionInterval}
-                    disabled={!exceptionDate || !exceptionFrom || !exceptionTo}
-                  >
-                    Agregar intervalo
-                  </Button>
-                </div>
-                {/* Lista de intervalos para la excepción actual */}
-                {exceptionIntervals.length > 0 && (
-                  <ul className="flex flex-wrap gap-2 justify-center mb-2">
-                    {exceptionIntervals.map((interval, idx) => (
-                      <li key={idx} className="flex items-center bg-barbershop-black border border-barbershop-blue/30 rounded px-3 py-2">
-                        <span className="mr-2 text-barbershop-white font-medium">{interval.from} - {interval.to}</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="ml-2 px-2 py-1 text-xs"
-                          onClick={() => handleDeleteExceptionInterval(idx)}
-                        >
-                          Eliminar
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <div className="flex flex-col md:flex-row gap-2 items-center justify-center">
-                  <Button
-                    variant="primary"
-                    size="md"
-                    onClick={handleSaveException}
-                    loading={savingException}
-                    disabled={!exceptionDate || savingException}
-                  >
-                    {exceptionIntervals.length === 0 ? "Bloquear día completo" : "Guardar excepción"}
-                  </Button>
-                  {exceptionIntervals.length > 0 && (
-                    <span className="text-xs text-gray-400">Si agregás intervalos, solo esos horarios estarán disponibles ese día</span>
-                  )}
-                </div>
-                {/* Lista de excepciones existentes */}
-                <div className="mt-6">
-                  <h3 className="text-lg font-semibold text-barbershop-blue mb-2">Días con excepción</h3>
-                  {exceptions.length === 0 ? (
-                    <div className="text-gray-400 text-sm">No hay excepciones</div>
+        {/* Tabs */}
+        <div className="flex gap-1 bg-white/5 border border-white/10 rounded-xl p-1 mb-8">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 flex-1 justify-center px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === tab.id
+                  ? "bg-[#b02e2e] text-white shadow-sm"
+                  : "text-gray-400 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              {tab.icon}
+              <span className="hidden sm:inline">{tab.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {authLoading || (loading && !appointments.length && !schedules[0]?.intervals.length) ? (
+          <div className="flex justify-center py-20"><LoadingSpinner size="lg" /></div>
+        ) : (
+          <>
+            {/* ── TAB: TURNOS ─────────────────────────────────────────────── */}
+            {activeTab === "appointments" && (
+              <div className="space-y-8">
+                {/* Próximos */}
+                <Section title="Próximos turnos" count={upcomingApts.length}>
+                  {upcomingApts.length === 0 ? (
+                    <EmptyState text="No tenés turnos próximos" />
                   ) : (
-                    <ul className="flex flex-col gap-2">
-                      {exceptions.map((ex) => (
-                        <li key={ex.date} className="flex flex-col md:flex-row md:items-center gap-2 md:gap-6 justify-between bg-barbershop-black/60 rounded-lg px-4 py-3">
-                          <div className="flex-1">
-                            <span className="font-semibold text-barbershop-white text-base mr-2">{new Date(ex.date).toLocaleDateString("es-AR", { weekday: "long", year: "numeric", month: "short", day: "numeric" })}</span>
-                            {ex.intervals.length === 0 ? (
-                              <span className="text-barbershop-red font-semibold ml-2">Bloqueado todo el día</span>
-                            ) : (
-                              <span className="text-barbershop-blue font-medium ml-2">Horarios: {ex.intervals.map((i) => `${i.from} - ${i.to}`).join(", ")}</span>
-                            )}
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="ml-2 px-2 py-1 text-xs"
-                            onClick={() => handleDeleteException(ex.date)}
-                          >
-                            Eliminar excepción
-                          </Button>
-                        </li>
+                    <div className="space-y-2">
+                      {upcomingApts.map((a) => <AptRow key={a.id} apt={a} />)}
+                    </div>
+                  )}
+                </Section>
+
+                {/* Historial */}
+                {pastApts.length > 0 && (
+                  <Section title="Historial" count={pastApts.length} muted>
+                    <div className="space-y-2">
+                      {pastApts.slice(0, 10).map((a) => <AptRow key={a.id} apt={a} muted />)}
+                    </div>
+                  </Section>
+                )}
+              </div>
+            )}
+
+            {/* ── TAB: HORARIOS ───────────────────────────────────────────── */}
+            {activeTab === "schedules" && (
+              <div className="space-y-6">
+                {/* Agregar intervalo */}
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                  <h2 className="text-white font-semibold text-sm mb-4">Agregar intervalo de atención</h2>
+                  <div className="flex flex-wrap gap-3 items-end">
+                    <div>
+                      <label className="text-gray-500 text-xs block mb-1">Día</label>
+                      <select
+                        value={selectedDay}
+                        onChange={(e) => setSelectedDay(e.target.value)}
+                        className="bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#b02e2e]/60 [color-scheme:dark]"
+                      >
+                        {DAYS.map((d) => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-gray-500 text-xs block mb-1">Desde</label>
+                      <input type="time" value={from} onChange={(e) => setFrom(e.target.value)}
+                        className="bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#b02e2e]/60 [color-scheme:dark]" />
+                    </div>
+                    <div>
+                      <label className="text-gray-500 text-xs block mb-1">Hasta</label>
+                      <input type="time" value={to} onChange={(e) => setTo(e.target.value)}
+                        className="bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#b02e2e]/60 [color-scheme:dark]" />
+                    </div>
+                    <button
+                      onClick={handleAddInterval}
+                      disabled={!from || !to}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-[#2e4a7d]/30 border border-[#2e4a7d]/40 text-blue-300 rounded-lg text-sm hover:bg-[#2e4a7d]/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Agregar
+                    </button>
+                  </div>
+                </div>
+
+                {/* Vista semanal */}
+                <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                  <div className="grid grid-cols-1 divide-y divide-white/5">
+                    {schedules.map((s) => (
+                      <div key={s.day} className="flex items-start gap-4 px-5 py-4">
+                        <span className={`w-24 flex-shrink-0 text-sm font-medium pt-0.5 ${
+                          s.intervals.length > 0 ? "text-white" : "text-gray-600"
+                        }`}>{s.day}</span>
+                        <div className="flex-1 flex flex-wrap gap-2 min-h-[28px]">
+                          {s.intervals.length === 0 ? (
+                            <span className="text-gray-700 text-xs italic pt-0.5">Sin atención</span>
+                          ) : (
+                            s.intervals.map((iv, idx) => (
+                              <div key={idx} className="flex items-center gap-1.5 bg-[#2e4a7d]/20 border border-[#2e4a7d]/30 rounded-lg px-3 py-1">
+                                <span className="text-blue-200 text-xs font-medium">{iv.from} – {iv.to}</span>
+                                <button
+                                  onClick={() => handleDeleteInterval(s.day, idx)}
+                                  className="text-gray-600 hover:text-red-400 transition-colors ml-1"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleSaveSchedules}
+                  disabled={saving}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-[#b02e2e] text-white text-sm font-medium rounded-xl hover:bg-[#b02e2e]/85 transition-colors disabled:opacity-50"
+                >
+                  {saving ? <LoadingSpinner size="sm" /> : <Save className="w-4 h-4" />}
+                  Guardar horarios
+                </button>
+              </div>
+            )}
+
+            {/* ── TAB: EXCEPCIONES ────────────────────────────────────────── */}
+            {activeTab === "exceptions" && (
+              <div className="space-y-6">
+                {/* Formulario */}
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
+                  <h2 className="text-white font-semibold text-sm">Bloquear o modificar un día específico</h2>
+                  <p className="text-gray-500 text-xs">
+                    Si no agregás intervalos, se bloqueará todo el día. Si agregás intervalos, solo esos horarios estarán disponibles.
+                  </p>
+
+                  <div>
+                    <label className="text-gray-500 text-xs block mb-1">Fecha</label>
+                    <input
+                      type="date"
+                      value={excDate}
+                      onChange={(e) => setExcDate(e.target.value)}
+                      min={today}
+                      className="bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#b02e2e]/60 [color-scheme:dark]"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap gap-3 items-end">
+                    <div>
+                      <label className="text-gray-500 text-xs block mb-1">Desde (opcional)</label>
+                      <input type="time" value={excFrom} onChange={(e) => setExcFrom(e.target.value)}
+                        className="bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#b02e2e]/60 [color-scheme:dark]" />
+                    </div>
+                    <div>
+                      <label className="text-gray-500 text-xs block mb-1">Hasta</label>
+                      <input type="time" value={excTo} onChange={(e) => setExcTo(e.target.value)}
+                        className="bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#b02e2e]/60 [color-scheme:dark]" />
+                    </div>
+                    <button
+                      onClick={handleAddExcInterval}
+                      disabled={!excFrom || !excTo}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-[#2e4a7d]/30 border border-[#2e4a7d]/40 text-blue-300 rounded-lg text-sm hover:bg-[#2e4a7d]/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Agregar intervalo
+                    </button>
+                  </div>
+
+                  {excIntervals.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {excIntervals.map((iv, idx) => (
+                        <div key={idx} className="flex items-center gap-1.5 bg-[#2e4a7d]/20 border border-[#2e4a7d]/30 rounded-lg px-3 py-1">
+                          <span className="text-blue-200 text-xs">{iv.from} – {iv.to}</span>
+                          <button onClick={() => setExcIntervals((p) => p.filter((_, i) => i !== idx))}
+                            className="text-gray-600 hover:text-red-400 transition-colors">
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleSaveException}
+                    disabled={!excDate || savingExc}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-[#b02e2e] text-white text-sm font-medium rounded-xl hover:bg-[#b02e2e]/85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {savingExc ? <LoadingSpinner size="sm" /> : <Ban className="w-4 h-4" />}
+                    {excIntervals.length === 0 ? "Bloquear día completo" : "Guardar excepción"}
+                  </button>
+                </div>
+
+                {/* Lista de excepciones */}
+                <div>
+                  <h2 className="text-white font-semibold text-sm mb-3">Días con excepción guardados</h2>
+                  {exceptions.length === 0 ? (
+                    <EmptyState text="No hay excepciones configuradas" />
+                  ) : (
+                    <div className="bg-white/5 border border-white/10 rounded-2xl divide-y divide-white/5 overflow-hidden">
+                      {exceptions.map((ex) => {
+                        const d = new Date(ex.date + "T12:00:00");
+                        const label = d.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "short" });
+                        return (
+                          <div key={ex.date} className="flex items-center justify-between px-5 py-4 gap-4">
+                            <div className="min-w-0">
+                              <p className="text-white text-sm font-medium capitalize">{label}</p>
+                              {ex.intervals.length === 0 ? (
+                                <p className="text-red-400 text-xs mt-0.5">Todo el día bloqueado</p>
+                              ) : (
+                                <p className="text-blue-300 text-xs mt-0.5">
+                                  Solo: {ex.intervals.map((i) => `${i.from}–${i.to}`).join(", ")}
+                                </p>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => handleDeleteException(ex.date)}
+                              className="flex-shrink-0 p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
-              </Card>
+              </div>
+            )}
+          </>
+        )}
+      </main>
 
-              <Card className="mb-10 bg-gradient-to-br from-white/10 to-white/5 border border-white/20 shadow-2xl">
-                <h2 className="text-xl font-bold text-white mb-4">Horarios por día</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {schedules.map((s) => (
-                    <div key={s.day} className="mb-2">
-                      <div className="font-semibold text-barbershop-blue mb-1 text-lg">{s.day}</div>
-                      {s.intervals.length === 0 ? (
-                        <div className="text-gray-400 text-sm">Sin intervalos</div>
-                      ) : (
-                        <ul className="flex flex-wrap gap-2 justify-center">
-                          {s.intervals.map((interval, idx) => (
-                            <li key={idx} className="flex items-center bg-barbershop-black border border-barbershop-blue/30 rounded px-3 py-2">
-                              <span className="mr-2 text-barbershop-white font-medium">{interval.from} - {interval.to}</span>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="ml-2 px-2 py-1 text-xs"
-                                onClick={() => handleDeleteInterval(s.day, idx)}
-                              >
-                                Eliminar
-                              </Button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </Card>
-
-              <Card className="mb-8 bg-gradient-to-br from-white/10 to-white/5 border border-white/20 shadow-2xl">
-                <h2 className="text-xl font-bold text-white mb-4">Turnos</h2>
-                {appointments.length === 0 ? (
-                  <div className="text-gray-400 text-sm">No hay turnos</div>
-                ) : (
-                  <ul>
-                    {appointments.map((a) => (
-                      <li key={a.id} className="mb-4 flex flex-col md:flex-row md:items-center gap-2 md:gap-6 justify-center text-barbershop-white bg-barbershop-black/60 rounded-lg px-4 py-3">
-                        <div className="flex-1">
-                          <div className="font-semibold text-barbershop-blue text-base">{a.services?.name || 'Servicio'}</div>
-                          <div className="text-sm text-gray-300">Cliente: <span className="font-medium">{a.customer_name}</span></div>
-                          <div className="text-xs text-gray-400">{a.customer_email}</div>
-                        </div>
-                        <div className="flex flex-col items-end">
-                          <span className="text-sm text-barbershop-white">{a.date ? new Date(a.date).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : ''}</span>
-                          <span className="text-xs text-gray-400">Duración: {a.duration_min} min</span>
-                          <span className="text-xs text-barbershop-blue font-semibold">{a.services?.price ? a.services.price.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' }) : ''}</span>
-                          <span className="text-xs mt-1 px-2 py-1 rounded bg-barbershop-blue/20 text-barbershop-blue font-semibold">
-                            {a.appointment_status?.name || getStatusText(a.status_id)}
-                          </span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </Card>
-            </>
-          )}
-        </main>
-      </div>
       <Footer />
-    </>
+    </div>
+  );
+}
+
+// ─── Sub-componentes ──────────────────────────────────────────────────────────
+
+function Section({ title, count, children, muted }: {
+  title: string; count: number; children: React.ReactNode; muted?: boolean;
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <h2 className={`text-sm font-semibold ${muted ? "text-gray-500" : "text-white"}`}>{title}</h2>
+        <span className="text-xs bg-white/8 text-gray-500 px-2 py-0.5 rounded-full">{count}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function AptRow({ apt, muted }: { apt: any; muted?: boolean }) {
+  const date = new Date(apt.date);
+  const timeStr = `${date.getUTCHours().toString().padStart(2, "0")}:${date.getUTCMinutes().toString().padStart(2, "0")}`;
+  const dateStr = date.toLocaleDateString("es-AR", { day: "numeric", month: "short", timeZone: "UTC" });
+
+  return (
+    <div className={`flex items-center justify-between px-4 py-3.5 rounded-xl border transition-colors ${
+      muted
+        ? "bg-white/3 border-white/6 opacity-60"
+        : "bg-white/5 border-white/10 hover:border-white/20"
+    }`}>
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="w-8 h-8 rounded-full bg-[#2e4a7d]/20 flex items-center justify-center text-xs font-bold text-[#2e4a7d] uppercase flex-shrink-0">
+          {apt.customer_name?.charAt(0) || "?"}
+        </div>
+        <div className="min-w-0">
+          <p className="text-white text-sm font-medium truncate">{apt.customer_name}</p>
+          <p className="text-gray-500 text-xs truncate">
+            {apt.services?.name || "Servicio"}
+            {apt.services?.price ? ` · $${apt.services.price.toLocaleString("es-AR")}` : ""}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+        <div className="text-right hidden sm:block">
+          <p className="text-white text-sm font-medium">{timeStr}</p>
+          <p className="text-gray-500 text-xs">{dateStr}</p>
+        </div>
+        <span className={`text-xs px-2 py-1 rounded-lg border font-medium ${getStatusColor(apt.status_id)}`}>
+          {getStatusLabel(apt.status_id)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="bg-white/3 border border-white/8 rounded-2xl p-10 text-center">
+      <p className="text-gray-600 text-sm">{text}</p>
+    </div>
   );
 }

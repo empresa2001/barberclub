@@ -1,195 +1,196 @@
 'use client';
 
-import { Menu, X } from 'lucide-react';
+import { Menu, X, LayoutDashboard, CalendarDays, LogOut, Scissors } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import Logo from './Logo';
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+
+// Perfil del usuario cacheado en la navbar
+interface UserProfile {
+  user_type_id: number; // 1=superadmin 2=admin 3=barber
+  barbershop_id?: string | null;
+}
 
 export default function Navbar() {
   const { user, logout } = useAuth();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [scrollY, setScrollY] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const pathname = usePathname();
 
   useEffect(() => {
-    const handleScroll = () => setScrollY(window.scrollY);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    const fn = () => setScrolled(window.scrollY > 40);
+    window.addEventListener('scroll', fn);
+    return () => window.removeEventListener('scroll', fn);
   }, []);
 
-  const isActive = (path: string) => pathname === path;
+  // Cargar perfil cuando hay usuario logueado
+  useEffect(() => {
+    if (!user) { setProfile(null); return; }
+
+    const fetchProfile = async () => {
+      const { data } = await supabase
+        .from('users')
+        .select('user_type_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!data) return;
+      const typeId = data.user_type_id;
+
+      if (typeId === 1 || typeId === 2) {
+        // Buscar barbershop_id del owner
+        const { data: shop } = await supabase
+          .from('barbershops')
+          .select('id')
+          .eq('owner_id', user.id)
+          .maybeSingle();
+        setProfile({ user_type_id: typeId, barbershop_id: shop?.id ?? null });
+      } else {
+        setProfile({ user_type_id: typeId });
+      }
+    };
+
+    fetchProfile();
+  }, [user]);
+
+  const isActive = (path: string) => pathname === path || (pathname?.startsWith(path + '/') ?? false);
+
+  // Construir los links según el rol
+  const getNavLinks = (): { href: string; label: string; icon?: React.ReactNode }[] => {
+    if (!user || !profile) {
+      return [
+        { href: '/',          label: 'Inicio' },
+        { href: '/barberias', label: 'Barberías' },
+        { href: '/book',      label: 'Agendar turno' },
+      ];
+    }
+    if (profile.user_type_id === 3) {
+      return [
+        { href: '/barberBook', label: 'Mi agenda', icon: <CalendarDays className="w-4 h-4" /> },
+      ];
+    }
+    const adminHref = profile.barbershop_id
+      ? `/adminBarber/${profile.barbershop_id}`
+      : '/adminBarber';
+    return [
+      { href: adminHref, label: 'Mi panel', icon: <LayoutDashboard className="w-4 h-4" /> },
+    ];
+  };
+
+  const navLinks = getNavLinks();
+
+  const NavLink = ({ href, label, icon }: { href: string; label: string; icon?: React.ReactNode }) => (
+    <Link
+      href={href}
+      onClick={() => setMenuOpen(false)}
+      className={`relative flex items-center gap-1.5 font-medium text-sm transition-colors group ${
+        isActive(href) ? 'text-white' : 'text-gray-400 hover:text-white'
+      }`}
+    >
+      {icon}
+      {label}
+      <span className={`absolute -bottom-1 left-0 h-px bg-[#b02e2e] transition-all duration-300 ${
+        isActive(href) ? 'w-full' : 'w-0 group-hover:w-full'
+      }`} />
+    </Link>
+  );
 
   return (
     <>
-      <header className={`bg-slate-950/80 backdrop-blur-2xl sticky top-0 z-50 transition-all duration-500 ${scrollY > 50 ? 'bg-slate-950/95' : ''}`}>
-        <div className="w-full mx-auto px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20 lg:h-24">
-            {/* Logo - Left side */}
-            <div className="lg:flex-1">
-            <Link href="/" className="inline-block">
-              <Logo size="md" />
-            </Link>
-            </div>
+      <header className={`sticky top-0 z-50 transition-all duration-300 ${
+        scrolled ? 'bg-[#1a1a1a]/98 shadow-lg shadow-black/30' : 'bg-[#1a1a1a]/90'
+      } backdrop-blur-xl border-b border-white/8`}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
 
-            {/* Centered Navigation */}
-            <nav className="hidden lg:flex items-center justify-center lg:flex-1 space-x-8 gap-20">
-              <Link 
-                href="/" 
-                className={`relative transition-all duration-300 font-medium text-lg xl:text-xl group ${
-                  isActive('/') 
-                    ? 'text-barbershop-red' 
-                    : 'text-gray-300 hover:text-white'
-                }`}
-              >
-                <span className="relative z-10">Inicio</span>
-                <div className="absolute inset-0 bg-gradient-to-r from-barbershop-red/0 to-barbershop-red/0 group-hover:from-barbershop-red/10 group-hover:to-barbershop-red/5 rounded-lg transition-all duration-300 -m-3"></div>
-                <span className={`absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-barbershop-red to-red-500 transition-all duration-500 ${
-                  isActive('/') ? 'w-full' : 'w-0 group-hover:w-full'
-                }`}></span>
-              </Link>
-              
-              <Link 
-                href="/barberias" 
-                className={`relative transition-all duration-300 font-medium text-lg xl:text-xl group ${
-                  isActive('/barberias') 
-                    ? 'text-barbershop-red' 
-                    : 'text-gray-300 hover:text-white'
-                }`}
-              >
-                <span className="relative z-10">Barberías</span>
-                <div className="absolute inset-0 bg-gradient-to-r from-barbershop-red/0 to-barbershop-red/0 group-hover:from-barbershop-red/10 group-hover:to-barbershop-red/5 rounded-lg transition-all duration-300 -m-3"></div>
-                <span className={`absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-barbershop-red to-red-500 transition-all duration-500 ${
-                  isActive('/barberias') ? 'w-full' : 'w-0 group-hover:w-full'
-                }`}></span>
-              </Link>
-              
-              <Link 
-                href="/book" 
-                className={`relative transition-all duration-300 font-medium text-lg xl:text-xl group ${
-                  isActive('/book') 
-                    ? 'text-barbershop-red' 
-                    : 'text-gray-300 hover:text-white'
-                }`}
-              >
-                <span className="relative z-10">Agendar Turno</span>
-                <div className="absolute inset-0 bg-gradient-to-r from-barbershop-red/0 to-barbershop-red/0 group-hover:from-barbershop-red/10 group-hover:to-barbershop-red/5 rounded-lg transition-all duration-300 -m-3"></div>
-                <span className={`absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-barbershop-red to-red-500 transition-all duration-500 ${
-                  isActive('/book') ? 'w-full' : 'w-0 group-hover:w-full'
-                }`}></span>
-              </Link>
-            </nav>
+          {/* Logo */}
+          <Link href="/" className="flex-shrink-0">
+            <Logo size="md" />
+          </Link>
 
-            {/* Right side - Iniciar Sesión */}
-            <div className="hidden lg:flex items-center justify-end lg:flex-1">
-              {user ? (
-                <button
-                  onClick={logout}
-                  className="px-4 py-2 bg-barbershop-red text-white rounded-lg hover:bg-red-700 transition-all"
-                >
-                  Cerrar sesión
-                </button>
-              ) : (
-                <Link 
-                  href="/login" 
-                  className="relative bg-gradient-to-r from-barbershop-red via-red-600 to-barbershop-red bg-size-200 bg-pos-0 hover:bg-pos-100 text-white px-6 lg:px-8 py-2.5 lg:py-3 rounded-full font-semibold text-lg xl:text-xl transition-all duration-500 shadow-xl shadow-barbershop-red/30 hover:shadow-barbershop-red/50 hover:scale-105 group overflow-hidden"
-                >
-                  <span className="relative z-10">Iniciar Sesión</span>
-                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-                </Link>
-              )}
-            </div>
+          {/* Desktop nav */}
+          <nav className="hidden md:flex items-center gap-8">
+            {navLinks.map((link) => (
+              <NavLink key={link.href} {...link} />
+            ))}
+          </nav>
 
-            {/* Mobile Menu Button */}
-            <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="lg:hidden relative p-3 rounded-xl bg-gray-800/50 backdrop-blur-sm text-gray-300 hover:text-white hover:bg-gray-700/50 transition-all duration-300 z-50"
-            >
-              {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </button>
+          {/* Desktop right action */}
+          <div className="hidden md:flex items-center gap-3">
+            {user ? (
+              <button
+                onClick={logout}
+                className="flex items-center gap-2 text-gray-400 hover:text-white text-sm transition-colors px-3 py-1.5 rounded-lg hover:bg-white/5"
+              >
+                <LogOut className="w-4 h-4" />
+                Cerrar sesión
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                className="px-4 py-2 bg-[#b02e2e] text-white text-sm font-medium rounded-xl hover:bg-[#b02e2e]/85 transition-colors"
+              >
+                Iniciar sesión
+              </Link>
+            )}
           </div>
+
+          {/* Mobile hamburger */}
+          <button
+            onClick={() => setMenuOpen((o) => !o)}
+            className="md:hidden p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+          >
+            {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
       </header>
 
-      {/* Mobile Navigation Overlay */}
-      {isMenuOpen && (
+      {/* Mobile menu */}
+      {menuOpen && (
         <>
-          {/* Backdrop */}
-          <div 
-            className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-40 animate-in fade-in duration-300"
-            onClick={() => setIsMenuOpen(false)}
+          <div
+            className="md:hidden fixed inset-0 bg-black/50 z-40"
+            onClick={() => setMenuOpen(false)}
           />
-          
-          {/* Mobile Menu */}
-          <div className="lg:hidden fixed top-20 left-0 right-0 bg-slate-950/95 backdrop-blur-xl border-t border-gray-800 shadow-2xl z-40 animate-in slide-in-from-top duration-300">
-            <div className="px-6 py-6">
-              <div className="space-y-4">
-                <Link 
-                  href="/" 
-                  className={`block transition-colors py-3 font-medium text-lg ${
-                    isActive('/') 
-                      ? 'text-barbershop-red' 
-                      : 'text-gray-300 hover:text-white'
+          <div className="md:hidden fixed top-16 left-0 right-0 z-40 bg-[#1a1a1a] border-b border-white/10 shadow-xl">
+            <nav className="px-4 py-4 space-y-1">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setMenuOpen(false)}
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                    isActive(link.href)
+                      ? 'bg-white/8 text-white'
+                      : 'text-gray-400 hover:text-white hover:bg-white/5'
                   }`}
-                  onClick={() => setIsMenuOpen(false)}
                 >
-                  Inicio
+                  {link.icon}
+                  {link.label}
                 </Link>
-                <Link 
-                  href="/barberias" 
-                  className={`block transition-colors py-3 font-medium text-lg ${
-                    isActive('/barberias') 
-                      ? 'text-barbershop-red' 
-                      : 'text-gray-300 hover:text-white'
-                  }`}
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Barberías
-                </Link>
-                <Link 
-                  href="/book" 
-                  className={`block transition-colors py-3 font-medium text-lg ${
-                    isActive('/book') 
-                      ? 'text-barbershop-red' 
-                      : 'text-gray-300 hover:text-white'
-                  }`}
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Agendar Turno
-                </Link>
-                <Link 
-                  href="/about" 
-                  className="block text-gray-300 hover:text-white transition-colors py-3 font-medium text-lg"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Nosotros
-                </Link>
-                <Link 
-                  href="/contact" 
-                  className="block text-gray-300 hover:text-white transition-colors py-3 font-medium text-lg"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Contacto
-                </Link>
+              ))}
+              <div className="pt-2 border-t border-white/8 mt-2">
                 {user ? (
                   <button
-                    onClick={logout}
-                    className="block w-full bg-gradient-to-r from-barbershop-red to-red-600 text-white px-6 py-3 rounded-xl font-semibold text-center text-lg shadow-lg mt-4"
+                    onClick={() => { setMenuOpen(false); logout(); }}
+                    className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
                   >
-                    Cerrar sesión
+                    <LogOut className="w-4 h-4" /> Cerrar sesión
                   </button>
                 ) : (
-                  <Link 
-                    href="/login" 
-                    className="block bg-gradient-to-r from-barbershop-red to-red-600 text-white px-6 py-3 rounded-xl font-semibold text-center text-lg shadow-lg mt-4"
-                    onClick={() => setIsMenuOpen(false)}
+                  <Link
+                    href="/login"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex items-center justify-center w-full px-3 py-2.5 bg-[#b02e2e] text-white rounded-xl text-sm font-medium"
                   >
-                    Iniciar Sesión
+                    Iniciar sesión
                   </Link>
                 )}
               </div>
-            </div>
+            </nav>
           </div>
         </>
       )}
