@@ -20,7 +20,7 @@ export default function Footer() {
   const { user } = useAuth();
 
   return (
-    <footer className="bg-[#111111] border-t border-white/8 mt-16">
+    <footer className="bg-[#1a1a1a] border-t border-white/8 mt-16">
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
 
         {/* Main grid */}
