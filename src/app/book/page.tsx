@@ -35,6 +35,7 @@ export default function BookPage() {
 function BookContent() {
   const searchParams = useSearchParams();
   const lockedShopId = searchParams?.get('barbershop') ?? null;
+  const lockedBarberId = searchParams?.get('barber') ?? null;
 
   const [currentStep, setCurrentStep] = useState(1);
 
@@ -67,6 +68,13 @@ function BookContent() {
   useEffect(() => {
     if (lockedShopId) setSelectedBarbershop(lockedShopId);
   }, [lockedShopId]);
+
+  // ── Si viene un barbero en la URL, fijarlo cuando estén cargados ───────────
+  useEffect(() => {
+    if (lockedBarberId && barbers.some((b) => b.id.toString() === lockedBarberId)) {
+      setSelectedBarber(lockedBarberId);
+    }
+  }, [lockedBarberId, barbers]);
 
   // ── Cargar barberos al cambiar barbería ───────────────────────────────────
   useEffect(() => {
@@ -453,7 +461,23 @@ function BookContent() {
                   </>
                 )}
 
-                {selectedBarbershop && (
+                {selectedBarbershop && lockedBarberId ? (
+                  /* Barbero fijado desde su link */
+                  <div className="flex items-center gap-3 p-4 rounded-xl bg-[#2e4a7d]/8 border border-[#2e4a7d]/25">
+                    <div className="w-10 h-10 rounded-xl bg-[#2e4a7d]/15 flex items-center justify-center flex-shrink-0">
+                      <User className="w-5 h-5 text-[#2e4a7d]" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-white font-semibold text-sm truncate">
+                        {barbers.find((b) => b.id.toString() === lockedBarberId)?.users?.name || 'Tu barbero'}
+                      </p>
+                      <p className="text-gray-400 text-xs truncate">Reservando con este barbero</p>
+                    </div>
+                    <span className="flex items-center gap-1 text-xs text-gray-500 flex-shrink-0">
+                      <Lock className="w-3 h-3" /> Fijado
+                    </span>
+                  </div>
+                ) : selectedBarbershop && (
                   <>
                     <StepTitle icon={<User className="w-5 h-5 text-[#b02e2e]" />} title="Seleccioná tu barbero" />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

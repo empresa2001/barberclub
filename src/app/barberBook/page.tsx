@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { schedulesApi, appointmentsApi } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
-import { CalendarDays, Clock, Ban, Plus, Trash2, Save, CheckCircle } from "lucide-react";
+import { CalendarDays, Clock, Ban, Plus, Trash2, Save, CheckCircle, Link2, Copy, Check, ExternalLink, MessageCircle } from "lucide-react";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import toast from "react-hot-toast";
 
@@ -35,6 +35,8 @@ function getStatusColor(id: number) {
 export default function BarberBookPage() {
   const { user, loading: authLoading } = useAuth();
   const [barberId, setBarberId] = useState<string | null>(null);
+  const [barbershopId, setBarbershopId] = useState<string | null>(null);
+  const [barberName, setBarberName] = useState<string>("");
   const [activeTab, setActiveTab] = useState<Tab>("appointments");
   const [loading, setLoading] = useState(true);
 
@@ -61,8 +63,16 @@ export default function BarberBookPage() {
   // ── Resolve barber ID ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
-    supabase.from("users").select("barber_id").eq("id", user.id).single()
-      .then(({ data }) => { if (data?.barber_id) setBarberId(data.barber_id); });
+    supabase.from("users").select("barber_id, name").eq("id", user.id).single()
+      .then(({ data }) => {
+        if (data?.name) setBarberName(data.name);
+        if (data?.barber_id) {
+          setBarberId(data.barber_id);
+          // Obtener la barbería a la que pertenece para armar el link
+          supabase.from("barbers").select("barbershop_id").eq("id", data.barber_id).single()
+            .then(({ data: b }) => { if (b?.barbershop_id) setBarbershopId(b.barbershop_id); });
+        }
+      });
   }, [user]);
 
   // ── Fetch all data ─────────────────────────────────────────────────────────
@@ -229,6 +239,15 @@ export default function BarberBookPage() {
             {/* ── TAB: TURNOS ─────────────────────────────────────────────── */}
             {activeTab === "appointments" && (
               <div className="space-y-8">
+                {/* Link de reservas con el barbero preseleccionado */}
+                {barbershopId && barberId && (
+                  <BarberShareLink
+                    barbershopId={barbershopId}
+                    barberId={barberId}
+                    barberName={barberName}
+                  />
+                )}
+
                 {/* Próximos */}
                 <Section title="Próximos turnos" count={upcomingApts.length}>
                   {upcomingApts.length === 0 ? (
@@ -440,6 +459,83 @@ export default function BarberBookPage() {
 }
 
 // ─── Sub-componentes ──────────────────────────────────────────────────────────
+
+function BarberShareLink({ barbershopId, barberId, barberName }: {
+  barbershopId: string;
+  barberId: string;
+  barberName: string;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  // Link directo al booking con la barbería y el barbero ya fijados
+  const bookingUrl = `${origin}/book?barbershop=${barbershopId}&barber=${barberId}`;
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(bookingUrl);
+      setCopied(true);
+      toast.success("¡Link copiado!");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("No se pudo copiar el link");
+    }
+  };
+
+  const waText = encodeURIComponent(
+    `¡Reservá tu turno conmigo${barberName ? `, ${barberName}` : ""}! 💈\n${bookingUrl}`
+  );
+  const whatsappUrl = `https://wa.me/?text=${waText}`;
+
+  return (
+    <div className="bg-gradient-to-r from-[#b02e2e]/15 to-[#2e4a7d]/15 border border-white/10 rounded-2xl p-5">
+      <div className="flex items-start gap-3 mb-4">
+        <div className="w-9 h-9 rounded-xl bg-[#b02e2e]/15 border border-[#b02e2e]/20 flex items-center justify-center flex-shrink-0">
+          <Link2 className="w-4 h-4 text-[#b02e2e]" />
+        </div>
+        <div>
+          <h3 className="text-white font-semibold text-sm">Tu link de reservas</h3>
+          <p className="text-gray-400 text-xs mt-0.5">
+            Compartilo y tus clientes reservan directamente con vos.
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 bg-[#1a1a1a]/60 border border-white/10 rounded-xl px-3 py-2.5 mb-3">
+        <Link2 className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+        <span className="text-gray-300 text-xs sm:text-sm truncate flex-1">{bookingUrl}</span>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1.5 px-4 py-2 bg-[#b02e2e] text-white text-xs font-medium rounded-lg hover:bg-[#b02e2e]/85 transition-colors"
+        >
+          {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+          {copied ? "Copiado" : "Copiar link"}
+        </button>
+        <a
+          href={whatsappUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600/90 text-white text-xs font-medium rounded-lg hover:bg-emerald-600 transition-colors"
+        >
+          <MessageCircle className="w-3.5 h-3.5" />
+          WhatsApp
+        </a>
+        <a
+          href={bookingUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 px-4 py-2 border border-white/15 text-gray-300 text-xs font-medium rounded-lg hover:bg-white/5 hover:text-white transition-colors"
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+          Probar
+        </a>
+      </div>
+    </div>
+  );
+}
 
 function Section({ title, count, children, muted }: {
   title: string; count: number; children: React.ReactNode; muted?: boolean;
