@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Eye, EyeOff, ArrowLeft, Lock, Mail, Crown, Building, Users, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft, Lock, Mail, Building, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import Input from "@/components/ui/Input";
@@ -9,17 +9,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import toast from "react-hot-toast";
 import { supabase } from "@/lib/supabase";
 
-type Role = "superadmin" | "barbershop_admin" | "barber";
-
-const ROLES: { id: Role; label: string; description: string; icon: React.ElementType; accent: string }[] = [
-  { id: "barbershop_admin", label: "Administrador", description: "Gestiona tu barbería", icon: Building, accent: "#b02e2e" },
-  { id: "barber",           label: "Barbero",        description: "Acceso profesional",   icon: Users,    accent: "#2e4a7d" },
-  { id: "superadmin",       label: "Super Admin",    description: "Control total",         icon: Crown,    accent: "#d97706" },
-];
-
 export default function LoginPage() {
   const { login } = useAuth();
-  const [role, setRole] = useState<Role>("barbershop_admin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -70,36 +61,34 @@ export default function LoginPage() {
 
     const { user_type_id, is_active } = userRow;
 
-    if (role === "barber" && is_active === false) {
+    // Barbero desactivado
+    if (user_type_id === 3 && is_active === false) {
       await supabase.auth.signOut();
       setIsLoading(false);
       setErrors({ general: "Tu cuenta está desactivada. Consultá con el administrador." });
       return;
     }
 
-    const canAccess =
-      (role === "superadmin"       && user_type_id === 1) ||
-      (role === "barbershop_admin" && (user_type_id === 1 || user_type_id === 2)) ||
-      (role === "barber"           && user_type_id === 3);
-
-    if (!canAccess) {
+    // Redirigir automáticamente según el rol detectado
+    if (user_type_id === 1) {
+      toast.success("¡Bienvenido!");
+      window.location.href = "/admin";
+    } else if (user_type_id === 2) {
+      const { data: shop } = await supabase.from("barbershops").select("id").eq("owner_id", user.id).maybeSingle();
+      if (!shop) {
+        setIsLoading(false);
+        setErrors({ general: "No se encontró la barbería asociada a tu cuenta." });
+        return;
+      }
+      toast.success("¡Bienvenido!");
+      window.location.href = `/adminBarber/${shop.id}`;
+    } else if (user_type_id === 3) {
+      toast.success("¡Bienvenido!");
+      window.location.href = "/barberBook";
+    } else {
       await supabase.auth.signOut();
       setIsLoading(false);
-      setErrors({ general: "No tenés permisos para acceder con este perfil." });
-      return;
-    }
-
-    toast.success("¡Bienvenido!");
-    setIsLoading(false);
-
-    if (role === "barbershop_admin") {
-      const { data: shop } = await supabase.from("barbershops").select("id").eq("owner_id", user.id).maybeSingle();
-      if (!shop) { setErrors({ general: "No se encontró la barbería asociada." }); return; }
-      window.location.href = `/adminBarber/${shop.id}`;
-    } else if (role === "superadmin") {
-      window.location.href = "/admin";
-    } else {
-      window.location.href = "/barberBook";
+      setErrors({ general: "Tu cuenta no tiene un rol válido asignado." });
     }
   };
 
@@ -116,33 +105,10 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
 
           {/* Logo */}
-          <div className="text-center mb-10">
+          <div className="text-center mb-8">
             <Logo size="lg" className="justify-center" />
-          </div>
-
-          {/* Role selector */}
-          <div className="mb-8">
-            <p className="text-gray-500 text-xs font-medium uppercase tracking-widest text-center mb-3">Accedés como</p>
-            <div className="flex gap-2">
-              {ROLES.map((r) => {
-                const Icon = r.icon;
-                const active = role === r.id;
-                return (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => setRole(r.id)}
-                    className={`flex-1 flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border-2 transition-all text-center ${
-                      active ? "border-current bg-current/10" : "border-white/10 bg-white/3 hover:border-white/20"
-                    }`}
-                    style={active ? { borderColor: r.accent, color: r.accent, backgroundColor: `${r.accent}15` } : {}}
-                  >
-                    <Icon className={`w-4 h-4 ${active ? "" : "text-gray-500"}`} />
-                    <span className={`text-xs font-medium leading-tight ${active ? "" : "text-gray-500"}`}>{r.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+            <h1 className="text-xl font-bold text-white mt-6">Iniciá sesión</h1>
+            <p className="text-gray-500 text-sm mt-1">Te llevamos a tu panel automáticamente</p>
           </div>
 
           {/* Form */}
