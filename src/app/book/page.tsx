@@ -1,13 +1,23 @@
 'use client';
 
-import { Calendar, Clock, MapPin, User, Phone, Mail } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
+import { Calendar, Clock, MapPin, User, Phone, Mail, CheckCircle, ChevronLeft, ChevronRight, Scissors } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import Input from '@/components/ui/Input';
 import toast from 'react-hot-toast';
 
+// ─── Wizard steps ───────────────────────────────────────────────────────────
+const STEPS = [
+  { id: 1, label: 'Barbería y barbero' },
+  { id: 2, label: 'Servicio' },
+  { id: 3, label: 'Fecha y hora' },
+  { id: 4, label: 'Tus datos' },
+];
+
 export default function BookPage() {
+  const [currentStep, setCurrentStep] = useState(1);
 
   const [selectedBarbershop, setSelectedBarbershop] = useState('');
   const [selectedBarber, setSelectedBarber] = useState('');
@@ -18,101 +28,69 @@ export default function BookPage() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
 
-  // Datos reales desde Supabase
   const [barbershops, setBarbershops] = useState<any[]>([]);
   const [barbers, setBarbers] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>('');
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
-  // Horarios disponibles desde Supabase (tabla schedules)
-  const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
-  const [allTimeSlots, setAllTimeSlots] = useState<{time: string, available: boolean}[]>([]);
+  const [allTimeSlots, setAllTimeSlots] = useState<{ time: string; available: boolean }[]>([]);
 
-  // Cargar barberías al montar
+  // ── Cargar barberías ──────────────────────────────────────────────────────
   useEffect(() => {
-    const fetchBarbershops = async () => {
-      const { data, error } = await supabase.from('barbershops').select('*').order('name');
-      if (!error) setBarbershops(data || []);
-    };
-    fetchBarbershops();
+    supabase.from('barbershops').select('*').order('name').then(({ data }) => {
+      if (data) setBarbershops(data);
+    });
   }, []);
 
-  // Cargar barberos (con nombre) cuando cambia la barbería
+  // ── Cargar barberos al cambiar barbería ───────────────────────────────────
   useEffect(() => {
-    if (!selectedBarbershop) {
-      setBarbers([]);
-      setServices([]);
-      setSelectedBarber('');
-      setSelectedService('');
-      return;
-    }
-    const fetchBarbers = async () => {
-      // Join correcto: traer barberos y el usuario relacionado (nombre y email)
-      // Si no existe la relación barbers_user_id_fkey, usar users(user_id)
-      const { data, error } = await supabase
-        .from('barbers')
-        .select('id, user_id, users!barbers_user_id_fkey(name, email)')
-        .eq('barbershop_id', selectedBarbershop);
-      if (!error && data) setBarbers(data);
-    };
-    fetchBarbers();
+    if (!selectedBarbershop) { setBarbers([]); return; }
+    supabase
+      .from('barbers')
+      .select('id, user_id, users!barbers_user_id_fkey(name, email)')
+      .eq('barbershop_id', selectedBarbershop)
+      .then(({ data }) => { if (data) setBarbers(data); });
   }, [selectedBarbershop]);
 
-  // Cargar servicios cuando cambia el barbero
+  // ── Cargar servicios al cambiar barbería ──────────────────────────────────
   useEffect(() => {
-    if (!selectedBarbershop) {
-      setServices([]);
-      setSelectedService('');
-      return;
-    }
-    const fetchServices = async () => {
-      const { data, error } = await supabase
-        .from('services')
-        .select('*')
-        .eq('barbershop_id', selectedBarbershop)
-        .order('name');
-      if (!error) setServices(data || []);
-    };
-    fetchServices();
+    if (!selectedBarbershop) { setServices([]); return; }
+    supabase
+      .from('services')
+      .select('*')
+      .eq('barbershop_id', selectedBarbershop)
+      .order('name')
+      .then(({ data }) => { if (data) setServices(data); });
   }, [selectedBarbershop]);
 
+  // ── Cargar slots disponibles ──────────────────────────────────────────────
   useEffect(() => {
-    // Solo buscar si hay barbero, fecha y servicio seleccionados
     if (!selectedBarber || !selectedDate || !selectedService) {
-      setAvailableTimeSlots([]);
       setAllTimeSlots([]);
       return;
     }
 
-    let isCancelled = false; // Flag para cancelar requests obsoletos
+    let cancelled = false;
 
-    const fetchAvailableSlots = async () => {
+    const fetchSlots = async () => {
+      setSlotsLoading(true);
       const dayOfWeek = new Date(selectedDate).getDay();
-      console.log('[DEBUG][BOOK] Fetching schedules for barber:', selectedBarber, 'date:', selectedDate, 'dayOfWeek:', dayOfWeek);
-      
-      // 1. Obtener horarios del barbero
+
       const { data: schedules, error: schedError } = await supabase
         .from('schedules')
         .select('from_time, to_time')
-        .eq('barber_id', selectedBarber.toString())
+        .eq('barber_id', selectedBarber)
         .eq('day_of_week', dayOfWeek);
 
-      if (isCancelled) return; // No continuar si el efecto fue cancelado
+      if (cancelled) return;
+      if (schedError || !schedules?.length) { setAllTimeSlots([]); setSlotsLoading(false); return; }
 
-      if (schedError || !schedules?.length) {
-        console.log('[DEBUG][BOOK] No schedules found:', schedError);
-        setAvailableTimeSlots([]);
-        setAllTimeSlots([]);
-        return;
-      }
-
-      // 2. Generar todos los slots posibles
       const allSlots: string[] = [];
       schedules.forEach((sch: any) => {
         let [h, m] = sch.from_time.split(':').map(Number);
         const [endH, endM] = sch.to_time.split(':').map(Number);
-        
         while (h < endH || (h === endH && m < endM)) {
           allSlots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
           m += 30;
@@ -120,913 +98,653 @@ export default function BookPage() {
         }
       });
 
-      // 3. Obtener duración del servicio
-      const selectedServiceObj = services.find(s => s.id === selectedService);
+      const selectedServiceObj = services.find((s) => s.id === selectedService);
       const serviceDuration = selectedServiceObj?.duration_min || 30;
-      
-      // 4. Verificar excepciones de horario para este día
-      console.log(`[DEBUG] Checking schedule exceptions for barber ${selectedBarber} on ${selectedDate}`);
-      
+
       const { data: scheduleExceptions } = await supabase
         .from('schedule_exceptions')
         .select('from_time, to_time')
         .eq('barber_id', selectedBarber)
         .eq('date', selectedDate);
 
-      console.log('[DEBUG] Schedule exceptions found:', scheduleExceptions);
+      if (cancelled) return;
 
-      // Si hay una excepción que bloquea todo el día (from_time y to_time son null)
-      const dayBlockedException = scheduleExceptions?.find(exc => exc.from_time === null && exc.to_time === null);
-      if (dayBlockedException) {
-        console.log('[DEBUG] Barber does not work on this day (full day exception)');
-        setAvailableTimeSlots([]);
-        setAllTimeSlots([]); // Establecer array vacío para indicar que no trabaja
-        return;
-      }
+      const dayBlocked = scheduleExceptions?.find((e: any) => e.from_time === null && e.to_time === null);
+      if (dayBlocked) { setAllTimeSlots([]); setSlotsLoading(false); return; }
 
-      // 5. Una sola consulta para obtener todas las citas del día
-      const selectedDateObj = new Date(selectedDate + 'T00:00:00');
-      const startOfDay = new Date(selectedDateObj);
+      const startOfDay = new Date(selectedDate + 'T00:00:00');
       startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(selectedDateObj);
+      const endOfDay = new Date(selectedDate + 'T00:00:00');
       endOfDay.setHours(23, 59, 59, 999);
-      
-      console.log(`[DEBUG] Fetching appointments for barber ${selectedBarber} on ${selectedDate}`);
-      console.log(`[DEBUG] Date range: ${startOfDay.toISOString()} to ${endOfDay.toISOString()}`);
-      
-      // RPC publica: devuelve rangos ocupados sin exponer datos del cliente.
-      // (la lectura directa de appointments esta bloqueada por RLS para anonimos)
+
       const { data: existingAppointments } = await supabase.rpc('get_busy_slots', {
         p_barber_id: selectedBarber,
         p_from: startOfDay.toISOString(),
         p_to: endOfDay.toISOString(),
       });
 
-      console.log('[DEBUG] Existing appointments found:', existingAppointments);
+      if (cancelled) return;
 
-      if (isCancelled) return;
+      const slotsWithAvailability: { time: string; available: boolean }[] = [];
 
-      // 6. Verificar disponibilidad para cada slot
-      const slotsWithAvailability: {time: string, available: boolean}[] = [];
-      const availableSlots: string[] = [];
-      
       for (const timeSlot of allSlots) {
-        if (isCancelled) return; // Cancelar si el efecto cambió
-        
-        // Verificar si ya existe una cita en esta fecha y hora exacta
+        if (cancelled) return;
         let isAvailable = true;
-        
-        console.log(`[DEBUG] Checking availability for slot: ${timeSlot} (service duration: ${serviceDuration} min)`);
-        
-        // Calcular cuántos slots necesita este servicio
         const slotsNeeded = Math.ceil(serviceDuration / 30);
-        console.log(`[DEBUG] Service needs ${slotsNeeded} slots (${serviceDuration} min ÷ 30 min)`);
-        
-        // Verificar si este slot y los siguientes están disponibles
-        const currentSlotIndex = allSlots.indexOf(timeSlot);
-        
+        const currentIdx = allSlots.indexOf(timeSlot);
+
         for (let i = 0; i < slotsNeeded; i++) {
-          const checkSlotIndex = currentSlotIndex + i;
-          
-          // Verificar que no se salga del rango de slots disponibles
-          if (checkSlotIndex >= allSlots.length) {
-            console.log(`[DEBUG] Slot ${timeSlot} not available: extends beyond working hours`);
-            isAvailable = false;
-            break;
-          }
-          
-          const checkSlot = allSlots[checkSlotIndex];
-          console.log(`[DEBUG] Checking required slot ${i + 1}/${slotsNeeded}: ${checkSlot}`);
-          
-          // Verificar si este slot está bloqueado por una excepción de horario
+          const checkIdx = currentIdx + i;
+          if (checkIdx >= allSlots.length) { isAvailable = false; break; }
+          const checkSlot = allSlots[checkIdx];
+
           for (const exc of scheduleExceptions || []) {
             if (exc.from_time && exc.to_time) {
-              // Convertir las horas a minutos para comparar más fácilmente
-              const excFromMinutes = exc.from_time.split(':').reduce((h, m) => h * 60 + parseInt(m), 0);
-              const excToMinutes = exc.to_time.split(':').reduce((h, m) => h * 60 + parseInt(m), 0);
-              const slotMinutes = checkSlot.split(':').reduce((h, m) => h * 60 + parseInt(m), 0);
-              
-              if (slotMinutes >= excFromMinutes && slotMinutes < excToMinutes) {
-                console.log(`[DEBUG] Slot ${checkSlot} blocked by modified schedule (${exc.from_time} - ${exc.to_time})`);
-                isAvailable = false;
-                break;
-              }
+              const excFrom = exc.from_time.split(':').reduce((h: number, m: string) => h * 60 + parseInt(m), 0);
+              const excTo = exc.to_time.split(':').reduce((h: number, m: string) => h * 60 + parseInt(m), 0);
+              const slotMin = checkSlot.split(':').reduce((h: number, m: string) => h * 60 + parseInt(m), 0);
+              if (slotMin >= excFrom && slotMin < excTo) { isAvailable = false; break; }
             }
           }
-          
           if (!isAvailable) break;
-          
-          // Verificar conflictos con citas existentes para este slot específico
+
           for (const apt of existingAppointments || []) {
             const existingDate = new Date(apt.date);
-            
-            // Extraer solo la fecha de la cita existente para comparar
-            const existingDateOnly = existingDate.toISOString().split('T')[0];
-            
-            // Solo procesar citas del día seleccionado
-            if (existingDateOnly !== selectedDate) {
-              continue;
-            }
-            
-            // Formatear la hora de la cita existente usando UTC
-            const existingHours = existingDate.getUTCHours().toString().padStart(2, '0');
-            const existingMinutes = existingDate.getUTCMinutes().toString().padStart(2, '0');
-            const existingTime = `${existingHours}:${existingMinutes}`;
-            
-            // Verificar si hay conflicto con cualquiera de los slots necesarios
-            if (existingTime === checkSlot) {
-              console.log(`[DEBUG] Conflict found: slot ${checkSlot} is occupied by existing appointment`);
-              isAvailable = false;
-              break;
-            }
-            
-            // También verificar si la cita existente se extiende hacia este slot
-            const existingDuration = apt.duration_min || 30;
-            const existingSlotsNeeded = Math.ceil(existingDuration / 30);
-            const existingSlotIndex = allSlots.indexOf(existingTime);
-            
-            if (existingSlotIndex !== -1) {
-              // Verificar si el slot actual está dentro del rango de la cita existente
-              if (checkSlotIndex >= existingSlotIndex && checkSlotIndex < (existingSlotIndex + existingSlotsNeeded)) {
-                console.log(`[DEBUG] Conflict found: slot ${checkSlot} is within range of existing ${existingDuration}min appointment at ${existingTime}`);
-                isAvailable = false;
-                break;
-              }
+            if (existingDate.toISOString().split('T')[0] !== selectedDate) continue;
+            const existingTime = `${existingDate.getUTCHours().toString().padStart(2, '0')}:${existingDate.getUTCMinutes().toString().padStart(2, '0')}`;
+            if (existingTime === checkSlot) { isAvailable = false; break; }
+            const existingSlotsNeeded = Math.ceil((apt.duration_min || 30) / 30);
+            const existingIdx = allSlots.indexOf(existingTime);
+            if (existingIdx !== -1 && checkIdx >= existingIdx && checkIdx < existingIdx + existingSlotsNeeded) {
+              isAvailable = false; break;
             }
           }
-          
           if (!isAvailable) break;
         }
-        
-        console.log(`[DEBUG] Slot ${timeSlot} availability: ${isAvailable ? '✅ AVAILABLE' : '❌ OCCUPIED'}`);
-        
+
         slotsWithAvailability.push({ time: timeSlot, available: isAvailable });
-        if (isAvailable) {
-          availableSlots.push(timeSlot);
-        }
       }
 
-      if (!isCancelled) {
-        console.log('[DEBUG][BOOK] Available slots after filtering:', availableSlots);
-        setAvailableTimeSlots(availableSlots);
-        setAllTimeSlots(slotsWithAvailability);
-      }
+      if (!cancelled) { setAllTimeSlots(slotsWithAvailability); setSlotsLoading(false); }
     };
 
-    fetchAvailableSlots();
-
-    // Cleanup function para cancelar requests obsoletos
-    return () => {
-      isCancelled = true;
-    };
+    fetchSlots();
+    return () => { cancelled = true; };
   }, [selectedBarber, selectedDate, selectedService]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // ── Submit ────────────────────────────────────────────────────────────────
+  const handleSubmit = async () => {
     setLoading(true);
-    setError('');
 
     try {
-      // Validar campos requeridos
-      if (!selectedBarbershop || !selectedBarber || !selectedService || !selectedDate || !selectedTime || !customerName || !customerEmail) {
-        setError('Por favor completa todos los campos requeridos.');
-        setLoading(false);
-        return;
-      }
-
-      // Validar formato de email
       const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim());
-      if (!emailOk) {
-        const msg = 'Ingresá un email válido.';
-        setError(msg); toast.error(msg); setLoading(false);
-        return;
-      }
+      if (!emailOk) { toast.error('Ingresá un email válido.'); setLoading(false); return; }
 
-      // Validar teléfono (si se completó): 8 a 15 digitos, permite +, espacios y guiones
-      if (customerPhone && customerPhone.trim()) {
+      if (customerPhone?.trim()) {
         const digits = customerPhone.replace(/[^\d]/g, '');
         if (digits.length < 8 || digits.length > 15) {
-          const msg = 'Ingresá un teléfono válido (8 a 15 dígitos).';
-          setError(msg); toast.error(msg); setLoading(false);
-          return;
+          toast.error('Ingresá un teléfono válido (8 a 15 dígitos).'); setLoading(false); return;
         }
       }
 
-      // Verificar que el horario seleccionado esté disponible
-      const selectedSlot = allTimeSlots.find(slot => slot.time === selectedTime);
-      if (!selectedSlot || !selectedSlot.available) {
-        setError('El horario seleccionado no está disponible. Por favor selecciona otro.');
-        setLoading(false);
-        return;
+      const selectedSlot = allTimeSlots.find((s) => s.time === selectedTime);
+      if (!selectedSlot?.available) {
+        toast.error('El horario seleccionado no está disponible.'); setLoading(false); return;
       }
 
-      // Buscar duración del servicio seleccionado
-      const selectedServiceObj = services.find(s => s.id === selectedService);
-      if (!selectedServiceObj) {
-        setError('Servicio no encontrado.');
-        setLoading(false);
-        return;
-      }
+      const selectedServiceObj = services.find((s) => s.id === selectedService);
+      if (!selectedServiceObj) { toast.error('Servicio no encontrado.'); setLoading(false); return; }
 
-      // Crear timestamp completo
-      const appointmentDateTime = `${selectedDate}T${selectedTime}:00`;
-      
-      // Verificación final de disponibilidad justo antes de insertar
-      const selectedDateObj = new Date(selectedDate + 'T00:00:00');
-      const startOfDay = new Date(selectedDateObj);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(selectedDateObj);
-      endOfDay.setHours(23, 59, 59, 999);
-      
-      // Verificar excepciones de horario antes de continuar
-      console.log(`[DEBUG] Final check: Verifying schedule exceptions for ${selectedDate}`);
-      const { data: finalScheduleExceptions } = await supabase
+      // Verificación final de excepciones
+      const { data: finalExceptions } = await supabase
         .from('schedule_exceptions')
         .select('from_time, to_time')
         .eq('barber_id', selectedBarber)
         .eq('date', selectedDate);
 
-      // Si hay una excepción que bloquea todo el día
-      const dayBlocked = finalScheduleExceptions?.find(exc => exc.from_time === null && exc.to_time === null);
-      if (dayBlocked) {
-        console.log('[DEBUG] ❌ CONFLICT: Day is completely blocked by exception');
-        setError('El barbero no trabaja en la fecha seleccionada. Por favor selecciona otra fecha.');
-        setLoading(false);
-        return;
+      if (finalExceptions?.find((e: any) => e.from_time === null && e.to_time === null)) {
+        toast.error('El barbero no trabaja en la fecha seleccionada.'); setLoading(false); return;
       }
 
-      // Verificar si el horario específico está bloqueado por excepciones
-      for (const exc of finalScheduleExceptions || []) {
+      for (const exc of finalExceptions || []) {
         if (exc.from_time && exc.to_time) {
-          const excFromMinutes = exc.from_time.split(':').reduce((h, m) => h * 60 + parseInt(m), 0);
-          const excToMinutes = exc.to_time.split(':').reduce((h, m) => h * 60 + parseInt(m), 0);
-          const selectedTimeMinutes = selectedTime.split(':').reduce((h, m) => h * 60 + parseInt(m), 0);
-          
-          if (selectedTimeMinutes >= excFromMinutes && selectedTimeMinutes < excToMinutes) {
-            console.log(`[DEBUG] ❌ CONFLICT: Time ${selectedTime} is blocked by schedule exception`);
-            setError('El barbero tiene horario modificado para esa fecha y no puede atender en el horario seleccionado. Por favor selecciona otro horario.');
-            setLoading(false);
-            return;
+          const excFrom = exc.from_time.split(':').reduce((h: number, m: string) => h * 60 + parseInt(m), 0);
+          const excTo = exc.to_time.split(':').reduce((h: number, m: string) => h * 60 + parseInt(m), 0);
+          const selMin = selectedTime.split(':').reduce((h: number, m: string) => h * 60 + parseInt(m), 0);
+          if (selMin >= excFrom && selMin < excTo) {
+            toast.error('El barbero tiene horario modificado para esa fecha.'); setLoading(false); return;
           }
         }
       }
-      
-      const { data: existingAppointments, error: checkError } = await supabase.rpc('get_busy_slots', {
+
+      const startOfDay = new Date(selectedDate + 'T00:00:00');
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(selectedDate + 'T00:00:00');
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const { data: existingApts, error: checkError } = await supabase.rpc('get_busy_slots', {
         p_barber_id: selectedBarber,
         p_from: startOfDay.toISOString(),
         p_to: endOfDay.toISOString(),
       });
 
-      if (checkError) {
-        console.error('Error checking availability:', checkError);
-        setError('Error verificando disponibilidad. Intenta nuevamente.');
-        setLoading(false);
-        return;
-      }
+      if (checkError) { toast.error('Error verificando disponibilidad.'); setLoading(false); return; }
 
-      console.log(`[DEBUG] Final availability check for ${selectedTime} on ${selectedDate}`);
-      console.log(`[DEBUG] Selected service duration: ${selectedServiceObj.duration_min} minutes`);
-      console.log(`[DEBUG] Found ${existingAppointments?.length || 0} existing appointments`);
-      
-      // Calcular cuántos slots necesita este servicio
-      const slotsNeeded = Math.ceil(selectedServiceObj.duration_min / 30);
-      console.log(`[DEBUG] Service needs ${slotsNeeded} consecutive slots`);
-      
-      // Generar todos los slots para verificar disponibilidad
       const dayOfWeek = new Date(selectedDate).getDay();
       const { data: schedules } = await supabase
-        .from('schedules')
-        .select('from_time, to_time')
-        .eq('barber_id', selectedBarber)
-        .eq('day_of_week', dayOfWeek);
-      
-      const allSlots: string[] = [];
-      if (schedules?.length) {
-        schedules.forEach((sch: any) => {
-          let [h, m] = sch.from_time.split(':').map(Number);
-          const [endH, endM] = sch.to_time.split(':').map(Number);
-          
-          while (h < endH || (h === endH && m < endM)) {
-            allSlots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
-            m += 30;
-            if (m >= 60) { h++; m = 0; }
-          }
-        });
-      }
-      
-      const currentSlotIndex = allSlots.indexOf(selectedTime);
-      
-      // Verificar que hay suficientes slots consecutivos disponibles
-      for (let i = 0; i < slotsNeeded; i++) {
-        const checkSlotIndex = currentSlotIndex + i;
-        
-        // Verificar que no se salga del rango
-        if (checkSlotIndex >= allSlots.length) {
-          console.log(`[DEBUG] ❌ CONFLICT: Service extends beyond working hours`);
-          setError('El servicio seleccionado no puede completarse en el horario de trabajo. Por favor selecciona un horario más temprano.');
-          setLoading(false);
-          return;
-        }
-        
-        const checkSlot = allSlots[checkSlotIndex];
-        console.log(`[DEBUG] Checking required slot ${i + 1}/${slotsNeeded}: ${checkSlot}`);
-        
-        // Verificar conflictos para este slot específico
-        for (const apt of existingAppointments || []) {
-          const existingDate = new Date(apt.date);
-          
-          // Extraer solo la fecha de la cita existente para comparar
-          const existingDateOnly = existingDate.toISOString().split('T')[0];
-          
-          // Solo procesar citas del día seleccionado
-          if (existingDateOnly !== selectedDate) {
-            continue;
-          }
-          
-          // Formatear la hora de la cita existente usando UTC
-          const existingHours = existingDate.getUTCHours().toString().padStart(2, '0');
-          const existingMinutes = existingDate.getUTCMinutes().toString().padStart(2, '0');
-          const existingTime = `${existingHours}:${existingMinutes}`;
-          
-          // Verificar conflicto directo
-          if (existingTime === checkSlot) {
-            console.log(`[DEBUG] ❌ CONFLICT DETECTED: Required slot ${checkSlot} is occupied`);
-            setError('Lo sentimos, ese horario ya no está disponible. Por favor selecciona otro.');
-            setLoading(false);
-            return;
-          }
-          
-          // Verificar si la cita existente se extiende hacia este slot
-          const existingDuration = apt.duration_min || 30;
-          const existingSlotsNeeded = Math.ceil(existingDuration / 30);
-          const existingSlotIndex = allSlots.indexOf(existingTime);
-          
-          if (existingSlotIndex !== -1 && checkSlotIndex >= existingSlotIndex && checkSlotIndex < (existingSlotIndex + existingSlotsNeeded)) {
-            console.log(`[DEBUG] ❌ CONFLICT DETECTED: Required slot ${checkSlot} conflicts with existing ${existingDuration}min appointment at ${existingTime}`);
-            setError('Lo sentimos, ese horario ya no está disponible. Por favor selecciona otro.');
-            setLoading(false);
-            return;
-          }
-        }
-      }
-      
-      console.log(`[DEBUG] ✅ No conflicts found, proceeding with booking`);
+        .from('schedules').select('from_time, to_time')
+        .eq('barber_id', selectedBarber).eq('day_of_week', dayOfWeek);
 
-      console.log('[DEBUG] Inserting appointment:', {
-        barber_id: selectedBarber,
-        service_id: selectedService,
-        date: appointmentDateTime,
-        duration_min: selectedServiceObj.duration_min,
-        customer_name: customerName
+      const allSlots: string[] = [];
+      schedules?.forEach((sch: any) => {
+        let [h, m] = sch.from_time.split(':').map(Number);
+        const [endH, endM] = sch.to_time.split(':').map(Number);
+        while (h < endH || (h === endH && m < endM)) {
+          allSlots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+          m += 30; if (m >= 60) { h++; m = 0; }
+        }
       });
 
-      // Insertar la cita
-      const { error } = await supabase.from('appointments').insert([
-        {
-          barber_id: selectedBarber,
-          service_id: selectedService,
-          date: appointmentDateTime,
-          duration_min: selectedServiceObj.duration_min,
-          status_id: 1, // Pendiente
-          customer_name: customerName,
-          customer_email: customerEmail,
-          customer_phone: customerPhone || null,
-        },
-      ]);
+      const slotsNeeded = Math.ceil(selectedServiceObj.duration_min / 30);
+      const currentIdx = allSlots.indexOf(selectedTime);
+
+      for (let i = 0; i < slotsNeeded; i++) {
+        const checkIdx = currentIdx + i;
+        if (checkIdx >= allSlots.length) {
+          toast.error('El servicio no puede completarse en ese horario.'); setLoading(false); return;
+        }
+        const checkSlot = allSlots[checkIdx];
+        for (const apt of existingApts || []) {
+          const existingDate = new Date(apt.date);
+          if (existingDate.toISOString().split('T')[0] !== selectedDate) continue;
+          const existingTime = `${existingDate.getUTCHours().toString().padStart(2, '0')}:${existingDate.getUTCMinutes().toString().padStart(2, '0')}`;
+          const existingIdx = allSlots.indexOf(existingTime);
+          if (existingTime === checkSlot || (existingIdx !== -1 && checkIdx >= existingIdx && checkIdx < existingIdx + Math.ceil((apt.duration_min || 30) / 30))) {
+            toast.error('Ese horario acaba de ser reservado. Por favor elegí otro.'); setLoading(false); return;
+          }
+        }
+      }
+
+      const { error } = await supabase.from('appointments').insert([{
+        barber_id: selectedBarber,
+        service_id: selectedService,
+        date: `${selectedDate}T${selectedTime}:00`,
+        duration_min: selectedServiceObj.duration_min,
+        status_id: 1,
+        customer_name: customerName,
+        customer_email: customerEmail,
+        customer_phone: customerPhone || null,
+      }]);
 
       setLoading(false);
 
       if (error) {
-        console.error('Error creating appointment:', error);
-        // 23P01 = exclusion_violation: el horario fue tomado por otra reserva (race condition)
         if (error.code === '23P01') {
-          const msg = 'Ese horario acaba de ser reservado por otra persona. Por favor elegí otro.';
-          setError(msg);
-          toast.error(msg);
+          toast.error('Ese horario acaba de ser reservado. Por favor elegí otro.');
         } else {
-          setError('Ocurrió un error al agendar el turno. Intenta nuevamente.');
-          toast.error('Ocurrió un error al agendar el turno. Intenta nuevamente.');
+          toast.error('Ocurrió un error al agendar. Intenta nuevamente.');
         }
       } else {
-        toast.success(`¡Turno agendado para el ${selectedDate} a las ${selectedTime}! Te enviaremos la confirmación por email.`, { duration: 6000 });
-
-        // Resetear formulario
-        setSelectedBarbershop('');
-        setSelectedBarber('');
-        setSelectedService('');
-        setSelectedDate('');
-        setSelectedTime('');
-        setCustomerName('');
-        setCustomerEmail('');
-        setCustomerPhone('');
-        
-        // Refrescar disponibilidad después de reserva exitosa
-        const refreshAvailability = async () => {
-          if (selectedBarber && selectedDate && selectedService) {
-            // Forzar refresco de horarios disponibles
-            const dayOfWeek = new Date(selectedDate).getDay();
-            
-            // Obtener horarios del barbero
-            const { data: schedules } = await supabase
-              .from('schedules')
-              .select('from_time, to_time')
-              .eq('barber_id', selectedBarber)
-              .eq('day_of_week', dayOfWeek);
-
-            if (schedules?.length) {
-              // Generar todos los slots posibles
-              const allSlots: string[] = [];
-              schedules.forEach((sch: any) => {
-                let [h, m] = sch.from_time.split(':').map(Number);
-                const [endH, endM] = sch.to_time.split(':').map(Number);
-                
-                while (h < endH || (h === endH && m < endM)) {
-                  allSlots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
-                  m += 30;
-                  if (m >= 60) { h++; m = 0; }
-                }
-              });
-
-              // Obtener excepciones de horario
-              const { data: scheduleExceptions } = await supabase
-                .from('schedule_exceptions')
-                .select('from_time, to_time')
-                .eq('barber_id', selectedBarber)
-                .eq('date', selectedDate);
-
-              // Si hay una excepción que bloquea todo el día
-              const dayBlockedException = scheduleExceptions?.find(exc => exc.from_time === null && exc.to_time === null);
-              if (dayBlockedException) {
-                console.log('[DEBUG] Refresh: Barber does not work on this day');
-                setAllTimeSlots([]); // Array vacío para indicar que no trabaja
-                setAvailableTimeSlots([]);
-                return;
-              }
-
-              // Obtener citas existentes
-              const selectedDateObj = new Date(selectedDate + 'T00:00:00');
-              const startOfDay = new Date(selectedDateObj);
-              startOfDay.setHours(0, 0, 0, 0);
-              const endOfDay = new Date(selectedDateObj);
-              endOfDay.setHours(23, 59, 59, 999);
-              
-              const { data: existingAppointments } = await supabase
-                .from('appointments')
-                .select('date, duration_min')
-                .eq('barber_id', selectedBarber)
-                .neq('status_id', 3)
-                .gte('date', startOfDay.toISOString())
-                .lte('date', endOfDay.toISOString());
-
-              // Verificar disponibilidad para cada slot
-              const selectedServiceObj = services.find(s => s.id === selectedService);
-              const serviceDuration = selectedServiceObj?.duration_min || 30;
-              
-              const slotsWithAvailability: {time: string, available: boolean}[] = [];
-              
-              for (const timeSlot of allSlots) {
-                // Verificar disponibilidad considerando la duración del servicio
-                let isAvailable = true;
-                
-                // Calcular cuántos slots necesita este servicio
-                const slotsNeeded = Math.ceil(serviceDuration / 30);
-                const currentSlotIndex = allSlots.indexOf(timeSlot);
-                
-                // Verificar si este slot y los siguientes están disponibles
-                for (let i = 0; i < slotsNeeded; i++) {
-                  const checkSlotIndex = currentSlotIndex + i;
-                  
-                  // Verificar que no se salga del rango
-                  if (checkSlotIndex >= allSlots.length) {
-                    isAvailable = false;
-                    break;
-                  }
-                  
-                  const checkSlot = allSlots[checkSlotIndex];
-                  
-                  // Verificar si este slot está bloqueado por una excepción de horario
-                  for (const exc of scheduleExceptions || []) {
-                    if (exc.from_time && exc.to_time) {
-                      const excFromMinutes = exc.from_time.split(':').reduce((h, m) => h * 60 + parseInt(m), 0);
-                      const excToMinutes = exc.to_time.split(':').reduce((h, m) => h * 60 + parseInt(m), 0);
-                      const slotMinutes = checkSlot.split(':').reduce((h, m) => h * 60 + parseInt(m), 0);
-                      
-                      if (slotMinutes >= excFromMinutes && slotMinutes < excToMinutes) {
-                        console.log(`[DEBUG] Refresh: Slot ${checkSlot} blocked by modified schedule (${exc.from_time} - ${exc.to_time})`);
-                        isAvailable = false;
-                        break;
-                      }
-                    }
-                  }
-                  
-                  if (!isAvailable) break;
-                  
-                  // Verificar conflictos con citas existentes
-                  for (const apt of existingAppointments || []) {
-                    const existingDate = new Date(apt.date);
-                    
-                    // Extraer solo la fecha de la cita existente para comparar
-                    const existingDateOnly = existingDate.toISOString().split('T')[0];
-                    
-                    // Solo procesar citas del día seleccionado
-                    if (existingDateOnly !== selectedDate) {
-                      continue;
-                    }
-                    
-                    // Formatear la hora de la cita existente usando UTC
-                    const existingHours = existingDate.getUTCHours().toString().padStart(2, '0');
-                    const existingMinutes = existingDate.getUTCMinutes().toString().padStart(2, '0');
-                    const existingTime = `${existingHours}:${existingMinutes}`;
-                    
-                    // Verificar conflicto directo
-                    if (existingTime === checkSlot) {
-                      isAvailable = false;
-                      break;
-                    }
-                    
-                    // Verificar si la cita existente se extiende hacia este slot
-                    const existingDuration = apt.duration_min || 30;
-                    const existingSlotsNeeded = Math.ceil(existingDuration / 30);
-                    const existingSlotIndex = allSlots.indexOf(existingTime);
-                    
-                    if (existingSlotIndex !== -1 && checkSlotIndex >= existingSlotIndex && checkSlotIndex < (existingSlotIndex + existingSlotsNeeded)) {
-                      isAvailable = false;
-                      break;
-                    }
-                  }
-                  
-                  if (!isAvailable) break;
-                }
-                
-                slotsWithAvailability.push({ time: timeSlot, available: isAvailable });
-              }
-              
-              setAllTimeSlots(slotsWithAvailability);
-            }
-          }
-        };
-        
-        refreshAvailability();
+        setSubmitted(true);
       }
-    } catch (error) {
-      console.error('Error in handleSubmit:', error);
-      setError('Ocurrió un error inesperado. Intenta nuevamente.');
+    } catch {
+      toast.error('Error inesperado. Intenta nuevamente.');
       setLoading(false);
     }
   };
 
-
-  // Resetear barbero y servicio seleccionados cuando cambie la barbería
-  const handleBarbershopChange = (barbershopId: string) => {
-    setSelectedBarbershop(barbershopId);
+  // ── Handlers de navegación ────────────────────────────────────────────────
+  const handleBarbershopChange = (id: string) => {
+    setSelectedBarbershop(id);
     setSelectedBarber('');
     setSelectedService('');
     setSelectedTime('');
+    setAllTimeSlots([]);
   };
 
-  // Resetear servicio y tiempo seleccionados cuando cambie el barbero
-  const handleBarberChange = (barberId: string) => {
-    setSelectedBarber(barberId);
-    setSelectedService('');
+  const handleBarberChange = (id: string) => {
+    setSelectedBarber(id);
     setSelectedTime('');
+    setAllTimeSlots([]);
   };
 
-  // Resetear tiempo cuando cambie el servicio
-  const handleServiceChange = (serviceId: string) => {
-    setSelectedService(serviceId);
-    setSelectedTime(''); // Resetear tiempo porque la duración afecta disponibilidad
+  const handleServiceChange = (id: string) => {
+    setSelectedService(id);
+    setSelectedTime('');
+    setAllTimeSlots([]);
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-gray-950 to-slate-900 relative overflow-hidden">
-  {/* Background Elements */}
-  <div className="absolute inset-0 pointer-events-none">
-    <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-gradient-to-br from-barbershop-red/8 via-red-600/4 to-transparent rounded-full blur-3xl animate-pulse"></div>
-    <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-gradient-to-tr from-barbershop-blue/6 via-blue-600/3 to-transparent rounded-full blur-3xl animate-pulse delay-2000"></div>
-    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] bg-gradient-radial from-barbershop-red/2 via-transparent to-transparent rounded-full animate-pulse delay-1000"></div>
-  </div>
+  const canAdvanceStep1 = !!selectedBarbershop && !!selectedBarber;
+  const canAdvanceStep2 = !!selectedService;
+  const canAdvanceStep3 = !!selectedDate && !!selectedTime;
+  const canAdvanceStep4 = !!customerName.trim() && !!customerEmail.trim();
 
-  {/* Header */}
-  <Navbar />
+  const canAdvance = [canAdvanceStep1, canAdvanceStep2, canAdvanceStep3, canAdvanceStep4];
 
-  {/* Main Content */}
-  <main className="relative z-10 p-4 sm:p-6 lg:p-20 flex justify-center">
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="text-center mb-8 sm:mb-12 lg:mb-16">
-        <h1 className="text-3xl sm:text-4xl lg:text-6xl font-black text-white mb-4 sm:mb-6 leading-tight">
-          Agenda tu{' '}
-          <span className="bg-gradient-to-r from-barbershop-red via-red-500 to-barbershop-blue bg-clip-text text-transparent">
-            Turno
-          </span>
-        </h1>
-        <p className="text-lg sm:text-xl lg:text-2xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
-          Reserva tu cita en la mejor barbería. Rápido, fácil y sin complicaciones.
-        </p>
-      </div>
-
-      {/* Booking Form */}
-      <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 shadow-2xl rounded-2xl sm:rounded-3xl p-4 sm:p-8 lg:p-16 hover:shadow-barbershop-red/10 transition-all duration-700">
-        
-        {/* Error Message */}
-        {error && (
-          <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 mb-4">
-            <p className="text-red-200 text-sm">{error}</p>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8 lg:space-y-10">
-          {/* Barbershop Selection */}
-          <div className="space-y-4 sm:space-y-6">
-            <label className="block text-white text-lg sm:text-xl font-bold mb-3 sm:mb-4">
-              <MapPin className="inline h-5 w-5 sm:h-6 sm:w-6 mr-2 sm:mr-3 text-barbershop-red" />
-              Selecciona la Barbería
-            </label>
-            <select
-              value={selectedBarbershop}
-              onChange={(e) => handleBarbershopChange(e.target.value)}
-              className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-white/5 border-2 border-white/20 rounded-lg sm:rounded-xl text-white text-base sm:text-lg focus:outline-none focus:border-barbershop-red/50 focus:ring-2 focus:ring-barbershop-red/50 transition-all duration-300 backdrop-blur-sm hover:bg-white/10 hover:border-white/30 cursor-pointer"
-              required
+  // ── Pantalla de éxito ─────────────────────────────────────────────────────
+  if (submitted) {
+    const shop = barbershops.find((s) => s.id.toString() === selectedBarbershop);
+    const barber = barbers.find((b) => b.id.toString() === selectedBarber);
+    const service = services.find((s) => s.id.toString() === selectedService);
+    return (
+      <div className="min-h-screen bg-[#1a1a1a] flex flex-col">
+        <Navbar />
+        <main className="flex-1 flex items-center justify-center p-6">
+          <div className="max-w-md w-full text-center space-y-6">
+            <div className="w-20 h-20 rounded-full bg-green-500/10 border-2 border-green-500/40 flex items-center justify-center mx-auto">
+              <CheckCircle className="w-10 h-10 text-green-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white mb-2">¡Turno confirmado!</h1>
+              <p className="text-gray-400">Te enviamos la confirmación a <span className="text-white">{customerEmail}</span></p>
+            </div>
+            <div className="bg-white/5 border border-white/10 rounded-xl p-5 text-left space-y-3">
+              <Detail icon={<MapPin className="w-4 h-4" />} label="Barbería" value={shop?.name || '—'} />
+              <Detail icon={<User className="w-4 h-4" />} label="Barbero" value={barber?.users?.name || '—'} />
+              <Detail icon={<Scissors className="w-4 h-4" />} label="Servicio" value={service?.name || '—'} />
+              <Detail icon={<Calendar className="w-4 h-4" />} label="Fecha" value={formatDate(selectedDate)} />
+              <Detail icon={<Clock className="w-4 h-4" />} label="Hora" value={selectedTime} />
+            </div>
+            <button
+              onClick={() => {
+                setSubmitted(false);
+                setCurrentStep(1);
+                setSelectedBarbershop(''); setSelectedBarber(''); setSelectedService('');
+                setSelectedDate(''); setSelectedTime('');
+                setCustomerName(''); setCustomerEmail(''); setCustomerPhone('');
+                setAllTimeSlots([]);
+              }}
+              className="w-full py-3 rounded-xl border border-white/20 text-gray-300 hover:bg-white/5 transition-colors text-sm"
             >
-              <option value="" className="bg-slate-800 text-gray-300">Selecciona una barbería</option>
-              {barbershops.map((shop) => (
-                <option key={shop.id} value={shop.id.toString()} className="bg-slate-800 text-white">
-                  {shop.name} - {shop.address}
-                </option>
-              ))}
-            </select>
+              Agendar otro turno
+            </button>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  // ── Layout principal ──────────────────────────────────────────────────────
+  return (
+    <div className="min-h-screen bg-[#1a1a1a] flex flex-col">
+      <Navbar />
+
+      <main className="flex-1 py-8 px-4 sm:px-6">
+        <div className="max-w-2xl mx-auto">
+
+          {/* Encabezado */}
+          <div className="mb-8">
+            <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">Agendar turno</h1>
+            <p className="text-gray-400 text-sm">Completá los pasos para reservar tu cita</p>
           </div>
 
-          {/* Barber Selection */}
-          <div className="space-y-4 sm:space-y-6 lg:space-y-8">
-            <label className="block text-white text-lg sm:text-xl font-bold mb-3 sm:mb-4 lg:mb-6">
-              <User className="inline h-5 w-5 sm:h-6 sm:w-6 mr-2 sm:mr-3 text-barbershop-red" />
-              Selecciona tu Barbero
-            </label>
-            {!selectedBarbershop ? (
-              <div className="p-4 sm:p-6 bg-white/5 border border-white/20 rounded-lg sm:rounded-xl text-center">
-                <p className="text-gray-400 text-sm sm:text-base lg:text-lg italic">Primero selecciona una barbería</p>
-              </div>
-            ) : (
-              <>
-                {/* Mobile: Select dropdown */}
-                <div className="block md:hidden">
-                  <select
-                    value={selectedBarber}
-                    onChange={(e) => handleBarberChange(e.target.value)}
-                    className="w-full px-4 py-3 bg-white/5 border-2 border-white/20 rounded-lg text-white text-base focus:outline-none focus:border-barbershop-blue/50 focus:ring-2 focus:ring-barbershop-blue/50 transition-all duration-300 backdrop-blur-sm hover:bg-white/10 hover:border-white/30 cursor-pointer"
-                    required
-                  >
-                    <option value="" className="bg-slate-800 text-gray-300">Selecciona un barbero</option>
-                    {barbers.map((barber) => (
-                      <option key={barber.id} value={barber.id.toString()} className="bg-slate-800 text-white">
-                        {barber.users?.name || 'Sin nombre'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+          {/* Barra de pasos */}
+          <StepBar steps={STEPS} current={currentStep} canAdvance={canAdvance} onStepClick={(s) => { if (s < currentStep || canAdvance[s - 2]) setCurrentStep(s); }} />
 
-                {/* Desktop: Button grid */}
-                <div className="hidden md:grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {barbers.map((barber) => (
-                    <button
-                      key={barber.id}
-                      type="button"
-                      onClick={() => handleBarberChange(barber.id.toString())}
-                      className={`p-6 rounded-xl border-2 transition-all duration-300 text-center relative cursor-pointer backdrop-blur-sm ${
-                        selectedBarber === barber.id.toString()
-                          ? 'border-barbershop-blue bg-barbershop-blue/20 text-white shadow-lg shadow-barbershop-blue/30 scale-105'
-                          : 'border-white/20 bg-white/5 text-gray-300 hover:border-barbershop-blue/50 hover:bg-white/10'
-                      }`}
-                    >
-                      {selectedBarber === barber.id.toString() && (
-                        <div className="absolute top-4 right-4 w-4 h-4 bg-barbershop-blue rounded-full animate-pulse"></div>
-                      )}
-                      <h3 className="font-bold text-lg mb-3">{barber.users?.name || 'Sin nombre'}</h3>
-                    </button>
+          {/* Contenido del paso */}
+          <div className="mt-6 bg-white/5 border border-white/10 rounded-2xl p-6 sm:p-8 animate-fade-in-up">
+
+            {/* PASO 1 — Barbería y barbero */}
+            {currentStep === 1 && (
+              <div className="space-y-6">
+                <StepTitle icon={<MapPin className="w-5 h-5 text-[#b02e2e]" />} title="Seleccioná la barbería" />
+                <div className="grid gap-3">
+                  {barbershops.map((shop) => (
+                    <SelectCard
+                      key={shop.id}
+                      active={selectedBarbershop === shop.id.toString()}
+                      onClick={() => handleBarbershopChange(shop.id.toString())}
+                      primary={shop.name}
+                      secondary={shop.address}
+                    />
                   ))}
+                  {barbershops.length === 0 && <EmptySlot text="Cargando barberías..." />}
                 </div>
-              </>
-            )}
-          </div>
 
-          {/* Service Selection */}
-          <div className="space-y-4 sm:space-y-6 lg:space-y-8">
-            <label className="block text-white text-lg sm:text-xl font-bold mb-3 sm:mb-4 lg:mb-6">
-              <Calendar className="inline h-5 w-5 sm:h-6 sm:w-6 mr-2 sm:mr-3 text-barbershop-red" />
-              Elige tu Servicio
-            </label>
-            
-            {!selectedBarber ? (
-              <div className="p-4 sm:p-6 bg-white/5 border border-white/20 rounded-lg sm:rounded-xl text-center">
-                <p className="text-gray-400 text-sm sm:text-base lg:text-lg italic">Primero selecciona un barbero</p>
+                {selectedBarbershop && (
+                  <>
+                    <StepTitle icon={<User className="w-5 h-5 text-[#b02e2e]" />} title="Seleccioná tu barbero" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {barbers.map((b) => (
+                        <SelectCard
+                          key={b.id}
+                          active={selectedBarber === b.id.toString()}
+                          onClick={() => handleBarberChange(b.id.toString())}
+                          primary={b.users?.name || 'Sin nombre'}
+                          secondary={b.users?.email}
+                        />
+                      ))}
+                      {barbers.length === 0 && <EmptySlot text="No hay barberos disponibles" />}
+                    </div>
+                  </>
+                )}
               </div>
-            ) : (
-              <>
-                {/* Mobile: Select dropdown */}
-                <div className="block md:hidden">
-                  <select
-                    value={selectedService}
-                    onChange={(e) => handleServiceChange(e.target.value)}
-                    className="w-full px-4 py-3 bg-white/5 border-2 border-white/20 rounded-lg text-white text-base focus:outline-none focus:border-barbershop-red/50 focus:ring-2 focus:ring-barbershop-red/50 transition-all duration-300 backdrop-blur-sm hover:bg-white/10 hover:border-white/30 cursor-pointer"
-                    required
-                  >
-                    <option value="" className="bg-slate-800 text-gray-300">Selecciona un servicio</option>
-                    {services.map((service) => (
-                      <option key={service.id} value={service.id} className="bg-slate-800 text-white">
-                        {service.name} {service.duration ? `- ${service.duration}` : ''} {service.price ? `- $${service.price}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            )}
 
-                {/* Desktop: Button grid */}
-                <div className="hidden md:grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {services.map((service) => (
+            {/* PASO 2 — Servicio */}
+            {currentStep === 2 && (
+              <div className="space-y-4">
+                <StepTitle icon={<Scissors className="w-5 h-5 text-[#b02e2e]" />} title="Elegí tu servicio" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {services.map((svc) => (
                     <button
-                      key={service.id}
+                      key={svc.id}
                       type="button"
-                      onClick={() => handleServiceChange(service.id.toString())}
-                      className={`p-6 rounded-xl border-2 transition-all duration-300 text-left relative cursor-pointer backdrop-blur-sm ${
-                        selectedService === service.id.toString() ? 'border-barbershop-red bg-barbershop-red/20 text-white shadow-lg shadow-barbershop-red/30 scale-105' : 'border-white/20 bg-white/5 text-gray-300 hover:border-barbershop-red/50 hover:bg-white/10'
+                      onClick={() => handleServiceChange(svc.id.toString())}
+                      className={`text-left p-4 rounded-xl border-2 transition-all duration-200 ${
+                        selectedService === svc.id.toString()
+                          ? 'border-[#b02e2e] bg-[#b02e2e]/10'
+                          : 'border-white/10 bg-white/3 hover:border-white/25 hover:bg-white/8'
                       }`}
                     >
-                      {selectedService === service.id.toString() && (
-                        <div className="absolute top-4 right-4 w-4 h-4 bg-barbershop-red rounded-full animate-pulse"></div>
-                      )}
-                      <h3 className="font-bold text-lg mb-3">{service.name}</h3>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm opacity-80">{service.duration}</span>
-                        <span className={`font-bold text-lg ${
-                          selectedService === service.id.toString() ? 'text-white' : 'text-barbershop-red'
-                        }`}>{service.price ? `$${service.price}` : ''}</span>
+                      <p className="font-semibold text-white text-sm">{svc.name}</p>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs text-gray-400">{svc.duration_min ? `${svc.duration_min} min` : ''}</span>
+                        {svc.price && (
+                          <span className={`text-sm font-bold ${selectedService === svc.id.toString() ? 'text-[#b02e2e]' : 'text-gray-300'}`}>
+                            ${svc.price}
+                          </span>
+                        )}
                       </div>
+                      {selectedService === svc.id.toString() && (
+                        <div className="mt-2 flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#b02e2e]" />
+                          <span className="text-xs text-[#b02e2e] font-medium">Seleccionado</span>
+                        </div>
+                      )}
                     </button>
                   ))}
+                  {services.length === 0 && <EmptySlot text="No hay servicios disponibles" />}
                 </div>
-              </>
+              </div>
             )}
-          </div>
 
-          {/* Date and Time Selection */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
-            <div className="space-y-3 sm:space-y-4">
-              <label className="block text-white text-lg sm:text-xl font-bold mb-3 sm:mb-4">
-                <Calendar className="inline h-5 w-5 sm:h-6 sm:w-6 mr-2 sm:mr-3 text-barbershop-red" />
-                Fecha
-              </label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
-                className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-white/5 border-2 border-white/20 rounded-lg sm:rounded-xl text-white text-base sm:text-lg focus:outline-none focus:border-barbershop-red/50 focus:ring-2 focus:ring-barbershop-red/50 transition-all duration-300 backdrop-blur-sm hover:bg-white/10 hover:border-white/30 [color-scheme:dark]"
-                style={{ colorScheme: 'dark' }}
-                required
-              />
-            </div>
+            {/* PASO 3 — Fecha y hora */}
+            {currentStep === 3 && (
+              <div className="space-y-6">
+                <div>
+                  <StepTitle icon={<Calendar className="w-5 h-5 text-[#b02e2e]" />} title="Elegí la fecha" />
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => { setSelectedDate(e.target.value); setSelectedTime(''); }}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="mt-3 w-full sm:w-auto px-4 py-3 bg-white/5 border border-white/15 rounded-xl text-white focus:outline-none focus:border-[#b02e2e]/60 focus:ring-1 focus:ring-[#b02e2e]/60 transition-colors [color-scheme:dark]"
+                    style={{ colorScheme: 'dark' }}
+                  />
+                </div>
 
-            <div className="space-y-3 sm:space-y-4">
-              <label className="block text-white text-lg sm:text-xl font-bold mb-3 sm:mb-4">
-                <Clock className="inline h-5 w-5 sm:h-6 sm:w-6 mr-2 sm:mr-3 text-barbershop-red" />
-                Horario
-              </label>
-              {!selectedBarber || !selectedService ? (
-                <div className="p-3 sm:p-4 bg-white/5 border border-white/20 rounded-lg sm:rounded-xl text-center">
-                  <p className="text-gray-400 text-xs sm:text-sm italic">
-                    {!selectedBarber ? 'Primero selecciona un barbero' : 'Selecciona un servicio'}
-                  </p>
-                </div>
-              ) : allTimeSlots.length === 0 && selectedDate ? (
-                <div className="p-3 sm:p-4 bg-red-900/20 border border-red-500/30 rounded-lg sm:rounded-xl text-center">
-                  <p className="text-red-300 text-xs sm:text-sm">
-                    🚫 El barbero no trabaja en la fecha seleccionada
-                  </p>
-                  <p className="text-red-400 text-xs mt-1">
-                    Por favor selecciona otra fecha
-                  </p>
-                </div>
-              ) : allTimeSlots.every(slot => !slot.available) && allTimeSlots.length > 0 ? (
-                <div className="p-3 sm:p-4 bg-yellow-900/20 border border-yellow-500/30 rounded-lg sm:rounded-xl text-center">
-                  <p className="text-yellow-300 text-xs sm:text-sm">
-                    ⏰ Todos los horarios están ocupados para esta fecha
-                  </p>
-                  <p className="text-yellow-400 text-xs mt-1">
-                    Intenta con otra fecha o un servicio más corto
-                  </p>
-                </div>
-              ) : (
-                <select
-                  value={selectedTime}
-                  onChange={(e) => {
-                    // Solo permitir seleccionar si la opción está disponible
-                    const selectedSlot = allTimeSlots.find(slot => slot.time === e.target.value);
-                    if (selectedSlot && selectedSlot.available) {
-                      setSelectedTime(e.target.value);
-                    }
-                  }}
-                  className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-white/5 border-2 border-white/20 rounded-lg sm:rounded-xl text-white text-base sm:text-lg focus:outline-none focus:border-barbershop-red/50 focus:ring-2 focus:ring-barbershop-red/50 transition-all duration-300 backdrop-blur-sm hover:bg-white/10 hover:border-white/30 cursor-pointer"
-                  required
-                >
-                  <option value="" className="bg-slate-800 text-gray-300">
-                    {allTimeSlots.length === 0 ? 'No hay horarios disponibles' : 'Selecciona un horario'}
-                  </option>
-                  {allTimeSlots.map((slot) => (
-                    <option 
-                      key={slot.time} 
-                      value={slot.available ? slot.time : ''} 
-                      disabled={!slot.available}
-                      className={`bg-slate-800 ${
-                        slot.available 
-                          ? 'text-white hover:bg-slate-700' 
-                          : 'text-gray-500 cursor-not-allowed bg-gray-800/50'
-                      }`}
-                    >
-                      {slot.time} {!slot.available ? '(Ocupado)' : ''}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-          </div>
+                {selectedDate && (
+                  <div>
+                    <StepTitle icon={<Clock className="w-5 h-5 text-[#b02e2e]" />} title="Elegí el horario" />
 
-          {/* Customer Information */}
-          <div className="space-y-4 sm:space-y-6 lg:space-y-8">
-            <h3 className="text-white text-lg sm:text-xl font-bold">Tus Datos de Contacto</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
-              <div className="space-y-3 sm:space-y-4">
-                <label className="block text-gray-300 mb-2 sm:mb-3 text-base sm:text-lg font-medium">
-                  <User className="inline h-4 w-4 sm:h-5 sm:w-5 mr-2 text-barbershop-red" />
-                  Nombre Completo
-                </label>
-                <input
-                  type="text"
+                    {slotsLoading && (
+                      <div className="mt-3 flex items-center gap-2 text-gray-400 text-sm">
+                        <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Verificando disponibilidad...
+                      </div>
+                    )}
+
+                    {!slotsLoading && allTimeSlots.length === 0 && selectedDate && (
+                      <div className="mt-3 p-4 rounded-xl bg-red-500/8 border border-red-500/20 text-center">
+                        <p className="text-red-300 text-sm font-medium">El barbero no trabaja este día</p>
+                        <p className="text-red-400/70 text-xs mt-1">Probá con otra fecha</p>
+                      </div>
+                    )}
+
+                    {!slotsLoading && allTimeSlots.length > 0 && (
+                      <>
+                        {/* Leyenda */}
+                        <div className="mt-3 mb-4 flex items-center gap-4 text-xs text-gray-400">
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-3 h-3 rounded bg-[#2e4a7d]/40 border border-[#2e4a7d]" />
+                            Disponible
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-3 h-3 rounded bg-white/5 border border-white/10" />
+                            Ocupado
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-3 h-3 rounded bg-[#b02e2e]/40 border border-[#b02e2e]" />
+                            Seleccionado
+                          </span>
+                        </div>
+
+                        {/* Grilla de slots */}
+                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                          {allTimeSlots.map((slot) => {
+                            const isSelected = selectedTime === slot.time;
+                            const isAvailable = slot.available;
+                            return (
+                              <button
+                                key={slot.time}
+                                type="button"
+                                disabled={!isAvailable}
+                                onClick={() => isAvailable && setSelectedTime(slot.time)}
+                                title={!isAvailable ? 'Ocupado' : undefined}
+                                className={`
+                                  relative py-2.5 rounded-lg text-sm font-medium transition-all duration-150
+                                  ${isSelected
+                                    ? 'bg-[#b02e2e]/40 border-2 border-[#b02e2e] text-white'
+                                    : isAvailable
+                                      ? 'bg-[#2e4a7d]/20 border border-[#2e4a7d]/50 text-white hover:bg-[#2e4a7d]/40 hover:border-[#2e4a7d] cursor-pointer'
+                                      : 'bg-white/3 border border-white/8 text-white/20 cursor-not-allowed'
+                                  }
+                                `}
+                              >
+                                {!isAvailable && (
+                                  <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <span className="w-full h-px bg-white/15 rotate-[-10deg] block absolute" />
+                                  </span>
+                                )}
+                                <span className={!isAvailable ? 'opacity-30' : ''}>{slot.time}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {allTimeSlots.every((s) => !s.available) && (
+                          <p className="mt-4 text-center text-sm text-yellow-300/70">Todos los horarios están ocupados. Probá con otra fecha.</p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* PASO 4 — Datos del cliente */}
+            {currentStep === 4 && (
+              <div className="space-y-5">
+                <StepTitle icon={<User className="w-5 h-5 text-[#b02e2e]" />} title="Tus datos de contacto" />
+
+                {/* Resumen de la reserva */}
+                <div className="p-4 rounded-xl bg-white/4 border border-white/10 grid grid-cols-2 gap-3 text-sm">
+                  <Detail icon={<MapPin className="w-3.5 h-3.5" />} label="Barbería" value={barbershops.find((s) => s.id.toString() === selectedBarbershop)?.name || '—'} compact />
+                  <Detail icon={<User className="w-3.5 h-3.5" />} label="Barbero" value={barbers.find((b) => b.id.toString() === selectedBarber)?.users?.name || '—'} compact />
+                  <Detail icon={<Scissors className="w-3.5 h-3.5" />} label="Servicio" value={services.find((s) => s.id.toString() === selectedService)?.name || '—'} compact />
+                  <Detail icon={<Clock className="w-3.5 h-3.5" />} label="Turno" value={`${formatDate(selectedDate)} ${selectedTime}`} compact />
+                </div>
+
+                <Input
+                  label="Nombre completo"
+                  placeholder="Juan Pérez"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="Juan Pérez"
-                  className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-white/5 border-2 border-white/20 rounded-lg sm:rounded-xl text-white placeholder-gray-400 text-base sm:text-lg focus:outline-none focus:border-barbershop-red/50 focus:ring-2 focus:ring-barbershop-red/50 transition-all duration-300 backdrop-blur-sm hover:bg-white/10 hover:border-white/30"
                   required
                 />
-              </div>
-
-              <div className="space-y-3 sm:space-y-4">
-                <label className="block text-gray-300 mb-2 sm:mb-3 text-base sm:text-lg font-medium">
-                  <Mail className="inline h-4 w-4 sm:h-5 sm:w-5 mr-2 text-barbershop-red" />
-                  Email
-                </label>
-                <input
+                <Input
+                  label="Email"
                   type="email"
+                  placeholder="tu@email.com"
                   value={customerEmail}
                   onChange={(e) => setCustomerEmail(e.target.value)}
-                  placeholder="tu@email.com"
-                  className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-white/5 border-2 border-white/20 rounded-lg sm:rounded-xl text-white placeholder-gray-400 text-base sm:text-lg focus:outline-none focus:border-barbershop-red/50 focus:ring-2 focus:ring-barbershop-red/50 transition-all duration-300 backdrop-blur-sm hover:bg-white/10 hover:border-white/30"
+                  helperText="Te enviaremos la confirmación del turno"
                   required
                 />
-                <p className="text-xs sm:text-sm text-gray-400 mt-1 sm:mt-2">Te enviaremos la confirmación del turno</p>
-              </div>
-
-              <div className="space-y-3 sm:space-y-4">
-                <label className="block text-gray-300 mb-2 sm:mb-3 text-base sm:text-lg font-medium">
-                  <Phone className="inline h-4 w-4 sm:h-5 sm:w-5 mr-2 text-barbershop-red" />
-                  Teléfono de Contacto
-                </label>
-                <input
+                <Input
+                  label="Teléfono"
                   type="tel"
+                  placeholder="+54 11 1234-5678"
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
-                  placeholder="+54 11 1234-5678"
-                  className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-white/5 border-2 border-white/20 rounded-lg sm:rounded-xl text-white placeholder-gray-400 text-base sm:text-lg focus:outline-none focus:border-barbershop-red/50 focus:ring-2 focus:ring-barbershop-red/50 transition-all duration-300 backdrop-blur-sm hover:bg-white/10 hover:border-white/30"
-                  required
+                  helperText="Opcional — para contactarte si hace falta"
                 />
-                <p className="text-xs sm:text-sm text-gray-400 mt-1 sm:mt-2">Para contactarte en caso de ser necesario</p>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            className={`w-full py-4 sm:py-5 px-6 sm:px-8 rounded-lg sm:rounded-xl font-bold text-lg sm:text-xl transition-all duration-500 shadow-xl group overflow-hidden relative cursor-pointer ${
-              loading 
-                ? 'bg-gray-600 cursor-not-allowed' 
-                : 'bg-gradient-to-r from-barbershop-red via-red-600 to-barbershop-red text-white hover:scale-105 shadow-barbershop-red/30 hover:shadow-barbershop-red/50'
-            }`}
-          >
-            <span className="relative z-10">
-              {loading ? '⏳ Agendando...' : '🎯 Confirmar Turno'}
-            </span>
-            {!loading && (
-              <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+          {/* Navegación entre pasos */}
+          <div className="mt-6 flex items-center justify-between">
+            {currentStep > 1 ? (
+              <button
+                type="button"
+                onClick={() => setCurrentStep((s) => s - 1)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/15 text-gray-300 hover:bg-white/5 transition-colors text-sm"
+              >
+                <ChevronLeft className="w-4 h-4" /> Anterior
+              </button>
+            ) : <span />}
+
+            {currentStep < 4 ? (
+              <button
+                type="button"
+                disabled={!canAdvance[currentStep - 1]}
+                onClick={() => setCurrentStep((s) => s + 1)}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#b02e2e] text-white font-medium text-sm hover:bg-[#b02e2e]/85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Siguiente <ChevronRight className="w-4 h-4" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={!canAdvanceStep4 || loading}
+                onClick={handleSubmit}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#b02e2e] text-white font-semibold text-sm hover:bg-[#b02e2e]/85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Agendando...
+                  </>
+                ) : (
+                  <>Confirmar turno <CheckCircle className="w-4 h-4" /></>
+                )}
+              </button>
             )}
-          </button>
-        </form>
+          </div>
+
+        </div>
+      </main>
+
+      <Footer />
+    </div>
+  );
+}
+
+// ─── Sub-componentes ─────────────────────────────────────────────────────────
+
+function StepBar({ steps, current, canAdvance, onStepClick }: {
+  steps: { id: number; label: string }[];
+  current: number;
+  canAdvance: boolean[];
+  onStepClick: (s: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-0">
+      {steps.map((step, idx) => {
+        const done = step.id < current;
+        const active = step.id === current;
+        const clickable = done || (step.id > 1 && canAdvance[step.id - 2]);
+        return (
+          <div key={step.id} className="flex items-center flex-1 min-w-0">
+            <button
+              type="button"
+              onClick={() => clickable && onStepClick(step.id)}
+              className={`flex flex-col items-center gap-1.5 flex-1 min-w-0 transition-opacity ${clickable ? 'cursor-pointer' : 'cursor-default'} ${!active && !done ? 'opacity-40' : ''}`}
+            >
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
+                done ? 'bg-[#b02e2e] border-[#b02e2e] text-white' :
+                active ? 'bg-transparent border-[#b02e2e] text-[#b02e2e]' :
+                'bg-transparent border-white/20 text-gray-500'
+              }`}>
+                {done ? <CheckCircle className="w-4 h-4" /> : step.id}
+              </div>
+              <span className={`text-xs text-center leading-tight hidden sm:block ${active ? 'text-white font-medium' : done ? 'text-gray-400' : 'text-gray-600'}`}>
+                {step.label}
+              </span>
+            </button>
+            {idx < steps.length - 1 && (
+              <div className={`h-px flex-1 mx-1 max-w-[32px] transition-colors ${done ? 'bg-[#b02e2e]/50' : 'bg-white/10'}`} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function StepTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
+  return (
+    <div className="flex items-center gap-2 mb-1">
+      {icon}
+      <h2 className="text-white font-semibold text-base">{title}</h2>
+    </div>
+  );
+}
+
+function SelectCard({ active, onClick, primary, secondary }: {
+  active: boolean; onClick: () => void; primary: string; secondary?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`text-left p-4 rounded-xl border-2 transition-all duration-150 w-full ${
+        active ? 'border-[#b02e2e] bg-[#b02e2e]/10' : 'border-white/10 bg-white/3 hover:border-white/25 hover:bg-white/8'
+      }`}
+    >
+      <p className="font-semibold text-white text-sm">{primary}</p>
+      {secondary && <p className="text-xs text-gray-400 mt-0.5 truncate">{secondary}</p>}
+      {active && (
+        <div className="mt-2 flex items-center gap-1.5">
+          <div className="w-1.5 h-1.5 rounded-full bg-[#b02e2e]" />
+          <span className="text-xs text-[#b02e2e] font-medium">Seleccionado</span>
+        </div>
+      )}
+    </button>
+  );
+}
+
+function EmptySlot({ text }: { text: string }) {
+  return (
+    <div className="col-span-full p-4 rounded-xl bg-white/3 border border-white/8 text-center">
+      <p className="text-gray-500 text-sm italic">{text}</p>
+    </div>
+  );
+}
+
+function Detail({ icon, label, value, compact }: { icon: React.ReactNode; label: string; value: string; compact?: boolean }) {
+  return (
+    <div className={`flex items-start gap-2 ${compact ? '' : 'py-1 border-b border-white/5 last:border-0'}`}>
+      <span className="text-gray-500 mt-0.5 flex-shrink-0">{icon}</span>
+      <div className="min-w-0">
+        <p className="text-gray-500 text-xs">{label}</p>
+        <p className="text-white text-xs font-medium truncate">{value}</p>
       </div>
     </div>
-  </main>
-
-  {/* Footer */}
-  <Footer />
-</div>
   );
+}
+
+function formatDate(dateStr: string) {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-');
+  return `${d}/${m}/${y}`;
 }
