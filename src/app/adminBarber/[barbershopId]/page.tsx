@@ -13,7 +13,9 @@ import {
   Users, Scissors, Settings, LayoutDashboard,
   TrendingUp, Calendar, Clock, Plus, Pencil, Trash2,
   CheckCircle, XCircle, RotateCcw, ChevronRight, Save, X,
+  Link2, Copy, Check, ExternalLink, MessageCircle,
 } from "lucide-react";
+import toast from "react-hot-toast";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -158,7 +160,13 @@ export default function AdminBarberPage() {
         ) : (
           <>
             {activeTab === "dashboard" && (
-              <DashboardTab appointments={appointments} barbers={barbers} services={services} />
+              <DashboardTab
+                appointments={appointments}
+                barbers={barbers}
+                services={services}
+                barbershopId={barbershopId}
+                barbershopName={barbershop?.name || ""}
+              />
             )}
             {activeTab === "barbers" && (
               <BarbersTab
@@ -185,10 +193,12 @@ export default function AdminBarberPage() {
 
 // ─── Dashboard Tab ────────────────────────────────────────────────────────────
 
-function DashboardTab({ appointments, barbers, services }: {
+function DashboardTab({ appointments, barbers, services, barbershopId, barbershopName }: {
   appointments: Appointment[];
   barbers: Barber[];
   services: Service[];
+  barbershopId: string;
+  barbershopName: string;
 }) {
   const today = new Date().toISOString().split("T")[0];
 
@@ -225,6 +235,9 @@ function DashboardTab({ appointments, barbers, services }: {
 
   return (
     <div className="space-y-8">
+      {/* Link de reservas */}
+      <ShareLinkCard barbershopId={barbershopId} barbershopName={barbershopName} />
+
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
@@ -329,6 +342,86 @@ function KpiCard({ label, value, icon, color }: {
       </div>
       <p className="text-2xl font-bold text-white">{value}</p>
       <p className="text-gray-500 text-xs mt-0.5">{label}</p>
+    </div>
+  );
+}
+
+// ─── Share Link Card ───────────────────────────────────────────────────────────
+
+function ShareLinkCard({ barbershopId, barbershopName }: {
+  barbershopId: string;
+  barbershopName: string;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  // Construir la URL pública (perfil de la barbería)
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const bookingUrl = `${origin}/barberias/${barbershopId}`;
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(bookingUrl);
+      setCopied(true);
+      toast.success("¡Link copiado!");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("No se pudo copiar el link");
+    }
+  };
+
+  const waText = encodeURIComponent(
+    `¡Reservá tu turno en ${barbershopName || "nuestra barbería"}! 💈\n${bookingUrl}`
+  );
+  const whatsappUrl = `https://wa.me/?text=${waText}`;
+
+  return (
+    <div className="bg-gradient-to-r from-[#b02e2e]/15 to-[#2e4a7d]/15 border border-white/10 rounded-2xl p-5 sm:p-6">
+      <div className="flex items-start gap-3 mb-4">
+        <div className="w-9 h-9 rounded-xl bg-[#b02e2e]/15 border border-[#b02e2e]/20 flex items-center justify-center flex-shrink-0">
+          <Link2 className="w-4 h-4 text-[#b02e2e]" />
+        </div>
+        <div>
+          <h3 className="text-white font-semibold text-sm">Tu link de reservas</h3>
+          <p className="text-gray-400 text-xs mt-0.5">
+            Compartilo con tus clientes para que saquen turno online.
+          </p>
+        </div>
+      </div>
+
+      {/* URL display */}
+      <div className="flex items-center gap-2 bg-[#1a1a1a]/60 border border-white/10 rounded-xl px-3 py-2.5 mb-3">
+        <Link2 className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+        <span className="text-gray-300 text-xs sm:text-sm truncate flex-1">{bookingUrl}</span>
+      </div>
+
+      {/* actions */}
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1.5 px-4 py-2 bg-[#b02e2e] text-white text-xs font-medium rounded-lg hover:bg-[#b02e2e]/85 transition-colors"
+        >
+          {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+          {copied ? "Copiado" : "Copiar link"}
+        </button>
+        <a
+          href={whatsappUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600/90 text-white text-xs font-medium rounded-lg hover:bg-emerald-600 transition-colors"
+        >
+          <MessageCircle className="w-3.5 h-3.5" />
+          WhatsApp
+        </a>
+        <a
+          href={bookingUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 px-4 py-2 border border-white/15 text-gray-300 text-xs font-medium rounded-lg hover:bg-white/5 hover:text-white transition-colors"
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+          Ver perfil
+        </a>
+      </div>
     </div>
   );
 }
