@@ -1,7 +1,8 @@
 'use client';
 
-import { Calendar, Clock, MapPin, User, Phone, Mail, CheckCircle, ChevronLeft, ChevronRight, Scissors } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Calendar, Clock, MapPin, User, Phone, Mail, CheckCircle, ChevronLeft, ChevronRight, Scissors, Lock } from 'lucide-react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -17,6 +18,24 @@ const STEPS = [
 ];
 
 export default function BookPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center">
+        <svg className="animate-spin w-6 h-6 text-[#b02e2e]" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+      </div>
+    }>
+      <BookContent />
+    </Suspense>
+  );
+}
+
+function BookContent() {
+  const searchParams = useSearchParams();
+  const lockedShopId = searchParams?.get('barbershop') ?? null;
+
   const [currentStep, setCurrentStep] = useState(1);
 
   const [selectedBarbershop, setSelectedBarbershop] = useState('');
@@ -43,6 +62,11 @@ export default function BookPage() {
       if (data) setBarbershops(data);
     });
   }, []);
+
+  // ── Si viene una barbería en la URL, fijarla automáticamente ───────────────
+  useEffect(() => {
+    if (lockedShopId) setSelectedBarbershop(lockedShopId);
+  }, [lockedShopId]);
 
   // ── Cargar barberos al cambiar barbería ───────────────────────────────────
   useEffect(() => {
@@ -380,7 +404,12 @@ export default function BookPage() {
           </div>
 
           {/* Barra de pasos */}
-          <StepBar steps={STEPS} current={currentStep} canAdvance={canAdvance} onStepClick={(s) => { if (s < currentStep || canAdvance[s - 2]) setCurrentStep(s); }} />
+          <StepBar
+            steps={lockedShopId ? [{ id: 1, label: 'Tu barbero' }, ...STEPS.slice(1)] : STEPS}
+            current={currentStep}
+            canAdvance={canAdvance}
+            onStepClick={(s) => { if (s < currentStep || canAdvance[s - 2]) setCurrentStep(s); }}
+          />
 
           {/* Contenido del paso */}
           <div className="mt-6 bg-white/5 border border-white/10 rounded-2xl p-6 sm:p-8 animate-fade-in-up">
@@ -388,19 +417,41 @@ export default function BookPage() {
             {/* PASO 1 — Barbería y barbero */}
             {currentStep === 1 && (
               <div className="space-y-6">
-                <StepTitle icon={<MapPin className="w-5 h-5 text-[#b02e2e]" />} title="Seleccioná la barbería" />
-                <div className="grid gap-3">
-                  {barbershops.map((shop) => (
-                    <SelectCard
-                      key={shop.id}
-                      active={selectedBarbershop === shop.id.toString()}
-                      onClick={() => handleBarbershopChange(shop.id.toString())}
-                      primary={shop.name}
-                      secondary={shop.address}
-                    />
-                  ))}
-                  {barbershops.length === 0 && <EmptySlot text="Cargando barberías..." />}
-                </div>
+                {lockedShopId ? (
+                  /* Barbería fijada desde su perfil */
+                  <div className="flex items-center gap-3 p-4 rounded-xl bg-[#b02e2e]/8 border border-[#b02e2e]/25">
+                    <div className="w-10 h-10 rounded-xl bg-[#b02e2e]/15 flex items-center justify-center flex-shrink-0">
+                      <MapPin className="w-5 h-5 text-[#b02e2e]" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-white font-semibold text-sm truncate">
+                        {barbershops.find((s) => s.id.toString() === lockedShopId)?.name || 'Barbería seleccionada'}
+                      </p>
+                      <p className="text-gray-400 text-xs truncate">
+                        {barbershops.find((s) => s.id.toString() === lockedShopId)?.address || 'Reservando en esta barbería'}
+                      </p>
+                    </div>
+                    <span className="flex items-center gap-1 text-xs text-gray-500 flex-shrink-0">
+                      <Lock className="w-3 h-3" /> Fijada
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <StepTitle icon={<MapPin className="w-5 h-5 text-[#b02e2e]" />} title="Seleccioná la barbería" />
+                    <div className="grid gap-3">
+                      {barbershops.map((shop) => (
+                        <SelectCard
+                          key={shop.id}
+                          active={selectedBarbershop === shop.id.toString()}
+                          onClick={() => handleBarbershopChange(shop.id.toString())}
+                          primary={shop.name}
+                          secondary={shop.address}
+                        />
+                      ))}
+                      {barbershops.length === 0 && <EmptySlot text="Cargando barberías..." />}
+                    </div>
+                  </>
+                )}
 
                 {selectedBarbershop && (
                   <>

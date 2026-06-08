@@ -156,13 +156,19 @@ export default function BarberiasPage() {
                         )}
                       </div>
 
-                      <div className="mt-auto">
+                      <div className="mt-auto flex gap-2">
+                        <Link
+                          href={`/barberias/${shop.id}`}
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-white/15 text-gray-300 text-sm font-medium rounded-xl hover:bg-white/5 hover:text-white transition-colors"
+                        >
+                          Ver perfil
+                        </Link>
                         <Link
                           href={`/book?barbershop=${shop.id}`}
-                          className="flex items-center justify-center gap-2 w-full py-2.5 bg-[#b02e2e] text-white text-sm font-medium rounded-xl hover:bg-[#b02e2e]/85 transition-colors"
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#b02e2e] text-white text-sm font-medium rounded-xl hover:bg-[#b02e2e]/85 transition-colors"
                         >
                           <Calendar className="w-4 h-4" />
-                          Agendar turno
+                          Agendar
                         </Link>
                       </div>
                     </div>
