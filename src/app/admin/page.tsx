@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Building2,
   Clock,
@@ -8,14 +8,13 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
+  RefreshCw,
   MapPin,
   Phone,
   Mail,
 } from 'lucide-react';
 import Logo from '@/components/Logo';
 import Link from 'next/link';
-import { barbershopsApi } from '@/lib/api';
-import { lookupService } from '@/lib/database';
 import { ConfirmModal } from '@/components/ui';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -65,11 +64,11 @@ function KpiCard({ icon: Icon, label, value, sub, color }: {
   icon: React.ElementType; label: string; value: number; sub: string; color: string;
 }) {
   return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-gray-500 text-xs uppercase tracking-widest mb-2">{label}</p>
-          <p className="text-3xl font-black text-white">{value}</p>
+          <p className="text-2xl sm:text-3xl font-black text-white">{value}</p>
           <p className="text-gray-600 text-xs mt-1">{sub}</p>
         </div>
         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color}`}>
@@ -83,7 +82,7 @@ function KpiCard({ icon: Icon, label, value, sub, color }: {
 // ─── page ────────────────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
-  const { user, loading } = useAuth();
+  const { user, session, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -123,31 +122,6 @@ export default function AdminDashboard() {
     message: '',
   });
 
-  // ── load ──────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const load = async () => {
-      try {
-        setIsLoading(true);
-        try { await lookupService.getBarbershopStatuses(); } catch {}
-        const data = await barbershopsApi.getAll() as any;
-        const processed: BarbershopWithRelations[] = data.map((b: any) => ({
-          ...b,
-          barbershop_status: b.barbershop_status || { name: 'pending' },
-          users: null,
-        }));
-        setBarbershops(processed);
-        setFiltered(processed);
-        recalcStats(processed);
-      } catch {
-        toast.error('Error al cargar datos');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    load();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // ── filter ────────────────────────────────────────────────────────────────
   useEffect(() => {
     let f = barbershops;
@@ -174,6 +148,47 @@ export default function AdminDashboard() {
     });
   }
 
+  const loadBarbershops = useCallback(async () => {
+    if (loading) return;
+    if (!user || !session?.access_token) {
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/superadmin/barbershops', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (response.status === 403) {
+        toast.error('No tenés permisos de superadmin');
+        router.replace('/');
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al cargar datos');
+      }
+
+      const processed = (result.barbershops ?? []) as BarbershopWithRelations[];
+      setBarbershops(processed);
+      setFiltered(processed);
+      recalcStats(processed);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error al cargar datos';
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [loading, router, session?.access_token, user]);
+
+  // ── load ──────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    loadBarbershops();
+  }, [loadBarbershops]);
+
   function openConfirm(id: string, currentStatus: string, newStatus: 'active' | 'inactive' | 'pending') {
     const bs = barbershops.find(b => b.id === id);
     if (!bs) return;
@@ -192,7 +207,18 @@ export default function AdminDashboard() {
     setLoadingStates(p => ({ ...p, [barbershopId]: true }));
     setConfirmModal(p => ({ ...p, isOpen: false }));
     try {
-      await barbershopsApi.updateStatus(barbershopId, newStatus);
+      if (!session?.access_token) throw new Error('Sesion invalida');
+      const response = await fetch('/api/superadmin/barbershops', {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: barbershopId, status: newStatus }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Error al actualizar');
+
       setBarbershops(prev => {
         const updated = prev.map(b =>
           b.id === barbershopId ? { ...b, barbershop_status: { name: newStatus } } : b
@@ -234,11 +260,11 @@ export default function AdminDashboard() {
 
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-50 bg-[#1a1a1a]/95 backdrop-blur-xl border-b border-white/8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 flex items-center justify-between h-16 gap-3">
           <div className="flex items-center gap-4">
-            <Link href="/"><Logo size="md" /></Link>
+            <Link href="/"><Logo size="sm" /></Link>
             <div className="h-5 w-px bg-white/10" />
-            <span className="text-white text-sm font-semibold">Super Admin</span>
+            <span className="hidden text-white text-sm font-semibold min-[380px]:inline">Super Admin</span>
           </div>
           <div className="w-8 h-8 bg-[#b02e2e]/20 border border-[#b02e2e]/30 rounded-lg flex items-center justify-center">
             <span className="text-[#b02e2e] text-xs font-bold">SA</span>
@@ -246,10 +272,26 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-widest text-[#b02e2e]">Panel superadmin</p>
+            <h1 className="mt-1 text-2xl font-bold text-white sm:text-3xl">Aprobación de barberías</h1>
+            <p className="mt-1 text-sm text-gray-500">Revisá altas nuevas, activá barberías y suspendé perfiles cuando haga falta.</p>
+          </div>
+          <button
+            type="button"
+            onClick={loadBarbershops}
+            disabled={isLoading}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Refrescar
+          </button>
+        </div>
 
         {/* ── KPI row ──────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <KpiCard icon={Building2}   label="Total"      value={stats.total_barbershops}    sub="registradas"       color="bg-[#2e4a7d]/20 text-[#2e4a7d]" />
           <KpiCard icon={CheckCircle} label="Activas"    value={stats.active_barbershops}   sub="operando"          color="bg-green-500/15 text-green-400" />
           <KpiCard icon={Clock}       label="Pendientes" value={stats.pending_barbershops}  sub="requieren acción"  color="bg-yellow-500/15 text-yellow-400" />
@@ -260,9 +302,9 @@ export default function AdminDashboard() {
         <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
 
           {/* toolbar */}
-          <div className="px-5 py-4 border-b border-white/8 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-            <div className="relative flex-1 max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+          <div className="px-4 sm:px-5 py-4 border-b border-white/8 flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
+            <div className="relative w-full lg:max-w-xs">
+              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
               <input
                 type="text"
                 placeholder="Buscar barbería…"
@@ -273,12 +315,12 @@ export default function AdminDashboard() {
             </div>
 
             {/* filter tabs */}
-            <div className="flex items-center gap-1 bg-white/5 border border-white/8 rounded-xl p-1">
+            <div className="flex w-full items-center gap-1 overflow-x-auto bg-white/5 border border-white/8 rounded-xl p-1 lg:w-auto">
               {FILTER_TABS.map(t => (
                 <button
                   key={t.value}
                   onClick={() => setStatusFilter(t.value)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
                     statusFilter === t.value ? 'bg-[#b02e2e] text-white' : 'text-gray-400 hover:text-white'
                   }`}
                 >
@@ -321,7 +363,7 @@ export default function AdminDashboard() {
                 return (
                   <div
                     key={b.id}
-                    className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_120px_180px] gap-4 px-5 py-4 hover:bg-white/3 transition-colors items-center"
+                    className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_120px_180px] gap-3 sm:gap-4 px-4 sm:px-5 py-4 hover:bg-white/3 transition-colors items-start sm:items-center"
                   >
                     {/* barbería */}
                     <div className="flex items-center gap-3 min-w-0">
@@ -365,7 +407,7 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* acciones */}
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap sm:justify-start">
                       {status === 'pending' && (
                         <>
                           <button

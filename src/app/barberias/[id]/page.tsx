@@ -125,7 +125,7 @@ export default function BarbershopProfile() {
     <div className="min-h-screen bg-[#1a1a1a] flex flex-col">
       <Navbar />
 
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 py-6">
+      <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 py-5 sm:py-6">
 
         {/* back */}
         <Link href="/barberias" className="inline-flex items-center gap-1.5 text-gray-400 hover:text-white text-sm transition-colors mb-5">
@@ -133,7 +133,7 @@ export default function BarbershopProfile() {
         </Link>
 
         {/* ── Hero ─────────────────────────────────────────────────────────── */}
-        <div className="relative h-52 sm:h-64 rounded-2xl overflow-hidden border border-white/10 mb-6">
+        <div className="relative h-48 sm:h-64 rounded-2xl overflow-hidden border border-white/10 mb-6">
           {shop.image_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={shop.image_url} alt={shop.name} className="w-full h-full object-cover" />
@@ -143,7 +143,7 @@ export default function BarbershopProfile() {
             </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-[#1a1a1a] via-[#1a1a1a]/40 to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-6">
+          <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6">
             <div className="flex items-center gap-2 mb-2">
               {isActive ? (
                 <span className="flex items-center gap-1 text-xs text-green-400 bg-green-500/10 border border-green-500/20 rounded-full px-2 py-0.5">
@@ -153,9 +153,9 @@ export default function BarbershopProfile() {
                 <span className="text-xs text-gray-400 bg-white/5 border border-white/10 rounded-full px-2 py-0.5">No disponible</span>
               )}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-white">{shop.name}</h1>
+            <h1 className="text-xl min-[380px]:text-2xl sm:text-3xl font-black text-white leading-tight break-words">{shop.name}</h1>
             {shop.location && (
-              <p className="flex items-center gap-1.5 text-gray-300 text-sm mt-1">
+              <p className="flex items-start gap-1.5 text-gray-300 text-sm mt-1">
                 <MapPin className="w-4 h-4 text-[#b02e2e]" /> {shop.location}
               </p>
             )}
@@ -170,7 +170,7 @@ export default function BarbershopProfile() {
           {isActive && (
             <Link
               href={`/book?barbershop=${shop.id}`}
-              className="flex items-center justify-center gap-2 px-6 py-3 bg-[#b02e2e] text-white text-sm font-semibold rounded-xl hover:bg-[#b02e2e]/85 transition-colors flex-shrink-0"
+              className="flex w-full items-center justify-center gap-2 px-6 py-3 bg-[#b02e2e] text-white text-sm font-semibold rounded-xl hover:bg-[#b02e2e]/85 transition-colors sm:w-auto sm:flex-shrink-0"
             >
               <Calendar className="w-4 h-4" /> Agendar turno
             </Link>
@@ -178,16 +178,16 @@ export default function BarbershopProfile() {
         </div>
 
         {/* contact pills */}
-        <div className="flex flex-wrap gap-3 mb-10">
+        <div className="flex flex-col min-[380px]:flex-row flex-wrap gap-3 mb-10">
           {shop.phone && (
-            <span className="flex items-center gap-2 text-gray-300 text-sm bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+            <span className="flex min-w-0 items-center gap-2 text-gray-300 text-sm bg-white/5 border border-white/10 rounded-xl px-3 py-2">
               <Phone className="w-4 h-4 text-[#2e4a7d]" /> {shop.phone}
             </span>
           )}
-          <span className="flex items-center gap-2 text-gray-300 text-sm bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+          <span className="flex min-w-0 items-center gap-2 text-gray-300 text-sm bg-white/5 border border-white/10 rounded-xl px-3 py-2">
             <User className="w-4 h-4 text-[#2e4a7d]" /> {barbers.length} {barbers.length === 1 ? 'barbero' : 'barberos'}
           </span>
-          <span className="flex items-center gap-2 text-gray-300 text-sm bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+          <span className="flex min-w-0 items-center gap-2 text-gray-300 text-sm bg-white/5 border border-white/10 rounded-xl px-3 py-2">
             <Scissors className="w-4 h-4 text-[#2e4a7d]" /> {services.length} {services.length === 1 ? 'servicio' : 'servicios'}
           </span>
         </div>
@@ -262,7 +262,7 @@ export default function BarbershopProfile() {
             </div>
             <Link
               href={`/book?barbershop=${shop.id}`}
-              className="flex items-center gap-2 px-6 py-3 bg-[#b02e2e] text-white text-sm font-semibold rounded-xl hover:bg-[#b02e2e]/85 transition-colors whitespace-nowrap"
+              className="flex w-full items-center justify-center gap-2 px-6 py-3 bg-[#b02e2e] text-white text-sm font-semibold rounded-xl hover:bg-[#b02e2e]/85 transition-colors sm:w-auto sm:whitespace-nowrap"
             >
               Agendar turno <ChevronRight className="w-4 h-4" />
             </Link>

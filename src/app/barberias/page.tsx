@@ -47,12 +47,12 @@ export default function BarberiasPage() {
       <main className="flex-1">
 
         {/* ── Hero ───────────────────────────────────────────────────────── */}
-        <section className="px-4 sm:px-6 pt-16 pb-10 text-center">
-          <div className="inline-flex items-center gap-2 bg-[#b02e2e]/10 border border-[#b02e2e]/20 rounded-full px-4 py-1.5 mb-6">
+        <section className="px-4 sm:px-6 pt-12 sm:pt-16 pb-8 sm:pb-10 text-center">
+          <div className="inline-flex max-w-full items-center gap-2 bg-[#b02e2e]/10 border border-[#b02e2e]/20 rounded-full px-3 py-1.5 sm:px-4 mb-6">
             <div className="w-1.5 h-1.5 rounded-full bg-[#b02e2e]" />
             <span className="text-[#b02e2e] text-xs font-medium tracking-wide">Barberías verificadas</span>
           </div>
-          <h1 className="text-3xl sm:text-5xl font-black text-white leading-tight mb-4">
+          <h1 className="text-2xl min-[380px]:text-3xl sm:text-5xl font-black text-white leading-tight mb-4">
             Encontrá tu{' '}
             <span className="bg-gradient-to-r from-[#b02e2e] to-[#2e4a7d] bg-clip-text text-transparent">
               barbería ideal
@@ -64,7 +64,7 @@ export default function BarberiasPage() {
 
           {/* search */}
           <div className="relative max-w-md mx-auto">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
             <input
               type="text"
               placeholder="Buscar por nombre o ubicación…"
@@ -76,7 +76,7 @@ export default function BarberiasPage() {
         </section>
 
         {/* ── Grid ───────────────────────────────────────────────────────── */}
-        <section className="px-4 sm:px-6 pb-20 max-w-6xl mx-auto">
+        <section className="px-4 sm:px-6 pb-14 sm:pb-20 max-w-6xl mx-auto w-full">
 
           {isLoading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -134,7 +134,7 @@ export default function BarberiasPage() {
                     </div>
 
                     {/* content */}
-                    <div className="p-5 flex flex-col flex-1">
+                    <div className="p-4 sm:p-5 flex flex-col flex-1">
                       <h3 className="text-white font-semibold text-base mb-1 truncate">{shop.name}</h3>
 
                       {shop.description && (
@@ -156,16 +156,16 @@ export default function BarberiasPage() {
                         )}
                       </div>
 
-                      <div className="mt-auto flex gap-2">
+                      <div className="mt-auto flex flex-col min-[380px]:flex-row gap-2">
                         <Link
                           href={`/barberias/${shop.id}`}
-                          className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-white/15 text-gray-300 text-sm font-medium rounded-xl hover:bg-white/5 hover:text-white transition-colors"
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 border border-white/15 text-gray-300 text-sm font-medium rounded-xl hover:bg-white/5 hover:text-white transition-colors"
                         >
                           Ver perfil
                         </Link>
                         <Link
                           href={`/book?barbershop=${shop.id}`}
-                          className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#b02e2e] text-white text-sm font-medium rounded-xl hover:bg-[#b02e2e]/85 transition-colors"
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-[#b02e2e] text-white text-sm font-medium rounded-xl hover:bg-[#b02e2e]/85 transition-colors"
                         >
                           <Calendar className="w-4 h-4" />
                           Agendar

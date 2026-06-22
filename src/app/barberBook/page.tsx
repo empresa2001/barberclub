@@ -191,6 +191,23 @@ export default function BarberBookPage() {
     toast.success("Excepción eliminada");
   };
 
+  const handleAppointmentStatus = async (appointmentId: string, statusId: number) => {
+    const payload: Record<string, any> = {
+      status_id: statusId,
+      updated_by: user?.id || null,
+    };
+    if (statusId === 3) payload.cancelled_at = new Date().toISOString();
+
+    const { error } = await supabase.from("appointments").update(payload).eq("id", appointmentId);
+    if (error) {
+      toast.error("No se pudo actualizar el turno");
+      return;
+    }
+
+    toast.success(statusId === 3 ? "Turno cancelado" : "Turno actualizado");
+    fetchData();
+  };
+
   // ── Tabs ───────────────────────────────────────────────────────────────────
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: "appointments", label: "Mis turnos",   icon: <CalendarDays className="w-4 h-4" /> },
@@ -206,16 +223,16 @@ export default function BarberBookPage() {
     <div className="min-h-screen bg-[#1a1a1a] flex flex-col">
       <Navbar />
 
-      <main className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 py-8">
+      <main className="flex-1 max-w-3xl mx-auto w-full px-3 sm:px-6 py-6 sm:py-8">
 
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-white">Mi agenda</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Mi agenda</h1>
           <p className="text-gray-500 text-sm mt-0.5">Gestión de turnos y horarios</p>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-white/5 border border-white/10 rounded-xl p-1 mb-8">
+        <div className="flex gap-1 bg-white/5 border border-white/10 rounded-xl p-1 mb-6 sm:mb-8">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -254,7 +271,7 @@ export default function BarberBookPage() {
                     <EmptyState text="No tenés turnos próximos" />
                   ) : (
                     <div className="space-y-2">
-                      {upcomingApts.map((a) => <AptRow key={a.id} apt={a} />)}
+                      {upcomingApts.map((a) => <AptRow key={a.id} apt={a} onStatusChange={handleAppointmentStatus} />)}
                     </div>
                   )}
                 </Section>
@@ -274,33 +291,33 @@ export default function BarberBookPage() {
             {activeTab === "schedules" && (
               <div className="space-y-6">
                 {/* Agregar intervalo */}
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                  <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5">
                   <h2 className="text-white font-semibold text-sm mb-4">Agregar intervalo de atención</h2>
-                  <div className="flex flex-wrap gap-3 items-end">
-                    <div>
+                  <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap sm:items-end">
+                    <div className="min-w-0">
                       <label className="text-gray-500 text-xs block mb-1">Día</label>
                       <select
                         value={selectedDay}
                         onChange={(e) => setSelectedDay(e.target.value)}
-                        className="bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#b02e2e]/60 [color-scheme:dark]"
+                        className="w-full bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#b02e2e]/60 [color-scheme:dark]"
                       >
                         {DAYS.map((d) => <option key={d} value={d}>{d}</option>)}
                       </select>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <label className="text-gray-500 text-xs block mb-1">Desde</label>
                       <input type="time" value={from} onChange={(e) => setFrom(e.target.value)}
-                        className="bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#b02e2e]/60 [color-scheme:dark]" />
+                        className="w-full bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#b02e2e]/60 [color-scheme:dark]" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <label className="text-gray-500 text-xs block mb-1">Hasta</label>
                       <input type="time" value={to} onChange={(e) => setTo(e.target.value)}
-                        className="bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#b02e2e]/60 [color-scheme:dark]" />
+                        className="w-full bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#b02e2e]/60 [color-scheme:dark]" />
                     </div>
                     <button
                       onClick={handleAddInterval}
                       disabled={!from || !to}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-[#2e4a7d]/30 border border-[#2e4a7d]/40 text-blue-300 rounded-lg text-sm hover:bg-[#2e4a7d]/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="flex min-h-10 items-center justify-center gap-1.5 px-4 py-2 bg-[#2e4a7d]/30 border border-[#2e4a7d]/40 text-blue-300 rounded-lg text-sm hover:bg-[#2e4a7d]/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <Plus className="w-3.5 h-3.5" /> Agregar
                     </button>
@@ -311,8 +328,8 @@ export default function BarberBookPage() {
                 <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
                   <div className="grid grid-cols-1 divide-y divide-white/5">
                     {schedules.map((s) => (
-                      <div key={s.day} className="flex items-start gap-4 px-5 py-4">
-                        <span className={`w-24 flex-shrink-0 text-sm font-medium pt-0.5 ${
+                      <div key={s.day} className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-start sm:gap-4 sm:px-5">
+                        <span className={`w-full sm:w-24 flex-shrink-0 text-sm font-medium pt-0.5 ${
                           s.intervals.length > 0 ? "text-white" : "text-gray-600"
                         }`}>{s.day}</span>
                         <div className="flex-1 flex flex-wrap gap-2 min-h-[28px]">
@@ -352,7 +369,7 @@ export default function BarberBookPage() {
             {activeTab === "exceptions" && (
               <div className="space-y-6">
                 {/* Formulario */}
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 space-y-4">
                   <h2 className="text-white font-semibold text-sm">Bloquear o modificar un día específico</h2>
                   <p className="text-gray-500 text-xs">
                     Si no agregás intervalos, se bloqueará todo el día. Si agregás intervalos, solo esos horarios estarán disponibles.
@@ -365,25 +382,25 @@ export default function BarberBookPage() {
                       value={excDate}
                       onChange={(e) => setExcDate(e.target.value)}
                       min={today}
-                      className="bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#b02e2e]/60 [color-scheme:dark]"
+                      className="w-full sm:w-auto bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#b02e2e]/60 [color-scheme:dark]"
                     />
                   </div>
 
-                  <div className="flex flex-wrap gap-3 items-end">
-                    <div>
+                  <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap sm:items-end">
+                    <div className="min-w-0">
                       <label className="text-gray-500 text-xs block mb-1">Desde (opcional)</label>
                       <input type="time" value={excFrom} onChange={(e) => setExcFrom(e.target.value)}
-                        className="bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#b02e2e]/60 [color-scheme:dark]" />
+                        className="w-full bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#b02e2e]/60 [color-scheme:dark]" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <label className="text-gray-500 text-xs block mb-1">Hasta</label>
                       <input type="time" value={excTo} onChange={(e) => setExcTo(e.target.value)}
-                        className="bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#b02e2e]/60 [color-scheme:dark]" />
+                        className="w-full bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#b02e2e]/60 [color-scheme:dark]" />
                     </div>
                     <button
                       onClick={handleAddExcInterval}
                       disabled={!excFrom || !excTo}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-[#2e4a7d]/30 border border-[#2e4a7d]/40 text-blue-300 rounded-lg text-sm hover:bg-[#2e4a7d]/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="flex min-h-10 items-center justify-center gap-1.5 px-4 py-2 bg-[#2e4a7d]/30 border border-[#2e4a7d]/40 text-blue-300 rounded-lg text-sm hover:bg-[#2e4a7d]/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <Plus className="w-3.5 h-3.5" /> Agregar intervalo
                     </button>
@@ -406,7 +423,7 @@ export default function BarberBookPage() {
                   <button
                     onClick={handleSaveException}
                     disabled={!excDate || savingExc}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-[#b02e2e] text-white text-sm font-medium rounded-xl hover:bg-[#b02e2e]/85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="flex min-h-11 w-full sm:w-auto items-center justify-center gap-2 px-5 py-2.5 bg-[#b02e2e] text-white text-sm font-medium rounded-xl hover:bg-[#b02e2e]/85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {savingExc ? <LoadingSpinner size="sm" /> : <Ban className="w-4 h-4" />}
                     {excIntervals.length === 0 ? "Bloquear día completo" : "Guardar excepción"}
@@ -424,7 +441,7 @@ export default function BarberBookPage() {
                         const d = new Date(ex.date + "T12:00:00");
                         const label = d.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "short" });
                         return (
-                          <div key={ex.date} className="flex items-center justify-between px-5 py-4 gap-4">
+                          <div key={ex.date} className="flex items-start justify-between px-4 py-4 gap-4 sm:px-5">
                             <div className="min-w-0">
                               <p className="text-white text-sm font-medium capitalize">{label}</p>
                               {ex.intervals.length === 0 ? (
@@ -551,13 +568,13 @@ function Section({ title, count, children, muted }: {
   );
 }
 
-function AptRow({ apt, muted }: { apt: any; muted?: boolean }) {
+function AptRow({ apt, muted, onStatusChange }: { apt: any; muted?: boolean; onStatusChange?: (appointmentId: string, statusId: number) => void }) {
   const date = new Date(apt.date);
   const timeStr = `${date.getUTCHours().toString().padStart(2, "0")}:${date.getUTCMinutes().toString().padStart(2, "0")}`;
   const dateStr = date.toLocaleDateString("es-AR", { day: "numeric", month: "short", timeZone: "UTC" });
 
   return (
-    <div className={`flex items-center justify-between px-4 py-3.5 rounded-xl border transition-colors ${
+    <div className={`flex items-center justify-between gap-3 px-4 py-3.5 rounded-xl border transition-colors ${
       muted
         ? "bg-white/3 border-white/6 opacity-60"
         : "bg-white/5 border-white/10 hover:border-white/20"
@@ -568,13 +585,17 @@ function AptRow({ apt, muted }: { apt: any; muted?: boolean }) {
         </div>
         <div className="min-w-0">
           <p className="text-white text-sm font-medium truncate">{apt.customer_name}</p>
+          {apt.booking_code && (
+            <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#2e4a7d]">{apt.booking_code}</p>
+          )}
           <p className="text-gray-500 text-xs truncate">
             {apt.services?.name || "Servicio"}
             {apt.services?.price ? ` · $${apt.services.price.toLocaleString("es-AR")}` : ""}
           </p>
+          <p className="text-gray-600 text-xs sm:hidden">{dateStr} {timeStr}</p>
         </div>
       </div>
-      <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+      <div className="flex flex-col items-end gap-2 flex-shrink-0 sm:flex-row sm:items-center sm:gap-3">
         <div className="text-right hidden sm:block">
           <p className="text-white text-sm font-medium">{timeStr}</p>
           <p className="text-gray-500 text-xs">{dateStr}</p>
@@ -582,6 +603,33 @@ function AptRow({ apt, muted }: { apt: any; muted?: boolean }) {
         <span className={`text-xs px-2 py-1 rounded-lg border font-medium ${getStatusColor(apt.status_id)}`}>
           {getStatusLabel(apt.status_id)}
         </span>
+        {!muted && onStatusChange && apt.status_id !== 3 && apt.status_id !== 4 && (
+          <div className="flex flex-wrap justify-end gap-1">
+            {apt.status_id !== 2 && (
+              <button
+                type="button"
+                onClick={() => onStatusChange(apt.id, 2)}
+                className="min-h-8 rounded-lg border border-[#2e4a7d]/40 px-2 py-1 text-[11px] font-semibold text-blue-200 hover:bg-[#2e4a7d]/20"
+              >
+                Confirmar
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => onStatusChange(apt.id, 4)}
+              className="min-h-8 rounded-lg border border-emerald-400/35 px-2 py-1 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-400/10"
+            >
+              Completar
+            </button>
+            <button
+              type="button"
+              onClick={() => onStatusChange(apt.id, 3)}
+              className="min-h-8 rounded-lg border border-red-400/35 px-2 py-1 text-[11px] font-semibold text-red-300 hover:bg-red-400/10"
+            >
+              Cancelar
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

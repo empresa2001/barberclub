@@ -11,27 +11,27 @@ export default function Home() {
       <Navbar />
 
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
-      <section className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 pt-20 pb-24 text-center">
+      <section className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 pt-14 pb-16 sm:pt-20 sm:pb-24 text-center">
         {/* Badge */}
-        <div className="inline-flex items-center gap-2 bg-[#b02e2e]/10 border border-[#b02e2e]/20 rounded-full px-4 py-1.5 mb-8">
+        <div className="inline-flex max-w-full items-center gap-2 bg-[#b02e2e]/10 border border-[#b02e2e]/20 rounded-full px-3 py-1.5 mb-6 sm:px-4 sm:mb-8">
           <div className="w-1.5 h-1.5 rounded-full bg-[#b02e2e]" />
           <span className="text-[#b02e2e] text-xs font-medium tracking-wide">Plataforma de gestión para barberías</span>
         </div>
 
         {/* Heading */}
-        <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black text-white leading-tight tracking-tight max-w-4xl">
+        <h1 className="text-3xl sm:text-5xl lg:text-7xl font-black text-white leading-tight tracking-tight max-w-4xl">
           Tu barbería,{' '}
           <span className="bg-gradient-to-r from-[#b02e2e] to-[#2e4a7d] bg-clip-text text-transparent">
             profesional
           </span>
         </h1>
 
-        <p className="mt-6 text-gray-400 text-lg sm:text-xl max-w-xl leading-relaxed">
+        <p className="mt-5 sm:mt-6 text-gray-400 text-base sm:text-xl max-w-xl leading-relaxed">
           Gestión de turnos, equipo y métricas para barberías que quieren operar con más orden y menos fricción.
         </p>
 
         {/* CTAs */}
-        <div className="mt-10 flex flex-col sm:flex-row gap-3 justify-center">
+        <div className="mt-8 sm:mt-10 flex w-full max-w-xs flex-col sm:w-auto sm:max-w-none sm:flex-row gap-3 justify-center">
           <Link
             href="/book"
             className="px-7 py-3 bg-[#b02e2e] text-white font-semibold rounded-xl hover:bg-[#b02e2e]/85 transition-colors text-sm"
@@ -47,7 +47,7 @@ export default function Home() {
         </div>
 
         {/* Stats */}
-        <div className="mt-20 grid grid-cols-2 sm:grid-cols-4 gap-8 sm:gap-12 max-w-2xl w-full">
+        <div className="mt-14 sm:mt-20 grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-12 max-w-2xl w-full">
           {[
             { value: '50+',  label: 'Barberías' },
             { value: '1K+',  label: 'Turnos / mes' },
@@ -63,12 +63,12 @@ export default function Home() {
       </section>
 
       {/* ── Features ──────────────────────────────────────────────────────── */}
-      <section className="bg-[#1a1a1a] border-t border-white/8 py-20 px-4 sm:px-6">
+      <section className="bg-[#1a1a1a] border-t border-white/8 py-14 sm:py-20 px-4 sm:px-6">
         <div className="max-w-5xl mx-auto">
 
           {/* Header */}
-          <div className="text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-black text-white">
+          <div className="text-center mb-10 sm:mb-14">
+            <h2 className="text-2xl sm:text-4xl font-black text-white">
               ¿Por qué{' '}
               <span className="bg-gradient-to-r from-[#b02e2e] to-[#2e4a7d] bg-clip-text text-transparent">
                 BarberClub?
@@ -80,7 +80,7 @@ export default function Home() {
           </div>
 
           {/* 3 feature cards */}
-          <div className="grid sm:grid-cols-3 gap-5 mb-14">
+          <div className="grid sm:grid-cols-3 gap-4 sm:gap-5 mb-10 sm:mb-14">
             {[
               {
                 icon: <Calendar className="w-6 h-6" />,
@@ -103,7 +103,7 @@ export default function Home() {
             ].map((f) => (
               <div
                 key={f.title}
-                className="bg-white/4 border border-white/8 rounded-2xl p-6 hover:border-white/15 transition-colors"
+                className="bg-white/4 border border-white/8 rounded-2xl p-5 sm:p-6 hover:border-white/15 transition-colors"
               >
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${f.color}`}>
                   {f.icon}
@@ -115,7 +115,7 @@ export default function Home() {
           </div>
 
           {/* 4 mini features */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 min-[380px]:grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             {[
               { icon: <Zap className="w-5 h-5" />,    label: 'Carga rápida',      color: 'text-[#b02e2e]' },
               { icon: <Shield className="w-5 h-5" />,  label: 'Datos seguros',     color: 'text-[#2e4a7d]' },
@@ -136,7 +136,7 @@ export default function Home() {
       </section>
 
       {/* ── CTA final ─────────────────────────────────────────────────────── */}
-      <section className="py-20 px-4 sm:px-6 text-center">
+      <section className="py-14 sm:py-20 px-4 sm:px-6 text-center">
         <div className="max-w-lg mx-auto space-y-5">
           <div className="w-12 h-12 rounded-2xl bg-[#b02e2e]/10 border border-[#b02e2e]/20 flex items-center justify-center mx-auto">
             <Scissors className="w-6 h-6 text-[#b02e2e]" />
@@ -147,7 +147,7 @@ export default function Home() {
           <p className="text-gray-500 text-sm leading-relaxed">
             Registrá tu barbería gratis y empezá a recibir turnos online hoy mismo.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+          <div className="flex w-full flex-col sm:w-auto sm:flex-row gap-3 justify-center pt-2">
             <Link
               href="/register"
               className="px-7 py-3 bg-[#b02e2e] text-white font-semibold rounded-xl hover:bg-[#b02e2e]/85 transition-colors text-sm"

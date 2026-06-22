@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { Eye, EyeOff, ArrowLeft, Lock, Mail, Building, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import Logo from "@/components/Logo";
-import Input from "@/components/ui/Input";
 import { useAuth } from "@/contexts/AuthContext";
 import toast from "react-hot-toast";
 import { supabase } from "@/lib/supabase";
@@ -95,24 +94,24 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[#1a1a1a] flex flex-col">
       {/* Back link */}
-      <div className="p-5">
+      <div className="p-4 sm:p-5">
         <Link href="/" className="inline-flex items-center gap-1.5 text-gray-400 hover:text-white text-sm transition-colors">
           <ArrowLeft className="w-4 h-4" /> Inicio
         </Link>
       </div>
 
-      <div className="flex-1 flex items-center justify-center px-4 py-8">
+      <div className="flex-1 flex items-center justify-center px-4 py-6 sm:py-8">
         <div className="w-full max-w-md">
 
           {/* Logo */}
-          <div className="text-center mb-8">
+          <div className="text-center mb-6 sm:mb-8">
             <Logo size="lg" className="justify-center" />
             <h1 className="text-xl font-bold text-white mt-6">Iniciá sesión</h1>
             <p className="text-gray-500 text-sm mt-1">Te llevamos a tu panel automáticamente</p>
           </div>
 
           {/* Form */}
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-5">
+          <form onSubmit={handleSubmit} className="bg-white/5 border border-white/10 rounded-2xl p-5 sm:p-6 space-y-5">
 
             {errors.general && (
               <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-300 text-sm">
@@ -121,45 +120,44 @@ export default function LoginPage() {
               </div>
             )}
 
-            <div className="relative">
-              <Input
+            <AuthField
                 label="Correo electrónico"
                 type="email"
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); setErrors((p) => ({ ...p, general: undefined })); }}
                 onBlur={() => setTouched((p) => ({ ...p, email: true }))}
                 placeholder="tu@email.com"
+                autoComplete="username"
                 error={errors.email}
+                icon={<Mail className="w-4 h-4" />}
                 required
               />
-              <Mail className="absolute left-4 top-[38px] w-4 h-4 text-gray-500 pointer-events-none" />
-            </div>
 
-            <div className="relative">
-              <Input
+            <AuthField
                 label="Contraseña"
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => { setPassword(e.target.value); setErrors((p) => ({ ...p, general: undefined })); }}
                 onBlur={() => setTouched((p) => ({ ...p, password: true }))}
                 placeholder="••••••••"
+                autoComplete="current-password"
                 error={errors.password}
                 required
-                className="pr-11"
+                icon={<Lock className="w-4 h-4" />}
+                action={
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((s) => !s)}
+                    className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
+                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                }
               />
-              <Lock className="absolute left-4 top-[38px] w-4 h-4 text-gray-500 pointer-events-none" />
-              <button
-                type="button"
-                onClick={() => setShowPassword((s) => !s)}
-                className="absolute right-3 top-[34px] p-1.5 text-gray-400 hover:text-white transition-colors"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
 
             <button
               type="submit"
-              onClick={handleSubmit}
               disabled={isLoading || !isValid}
               className="w-full py-3 rounded-xl bg-[#b02e2e] text-white font-semibold text-sm hover:bg-[#b02e2e]/85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
@@ -179,14 +177,14 @@ export default function LoginPage() {
                 ¿Olvidaste tu contraseña?
               </Link>
             </div>
-          </div>
+          </form>
 
           {/* Register link */}
           <div className="mt-6 text-center">
             <p className="text-gray-500 text-sm mb-3">¿Primera vez aquí?</p>
             <Link
               href="/register"
-              className="inline-flex items-center gap-2 px-5 py-2.5 border border-white/15 rounded-xl text-gray-300 hover:text-white hover:border-white/30 hover:bg-white/5 transition-all text-sm"
+              className="inline-flex min-h-11 items-center justify-center gap-2 px-5 py-2.5 border border-white/15 rounded-xl text-gray-300 hover:text-white hover:border-white/30 hover:bg-white/5 transition-all text-sm"
             >
               <Building className="w-4 h-4" /> Registrar mi barbería
             </Link>
@@ -194,6 +192,42 @@ export default function LoginPage() {
 
         </div>
       </div>
+    </div>
+  );
+}
+
+type AuthFieldProps = React.InputHTMLAttributes<HTMLInputElement> & {
+  label: string;
+  error?: string;
+  icon: React.ReactNode;
+  action?: React.ReactNode;
+};
+
+function AuthField({ label, error, icon, action, required, ...props }: AuthFieldProps) {
+  return (
+    <div className="space-y-2">
+      <label className="block text-sm font-medium text-white">
+        {label}
+        {required && <span className="ml-1 text-[#b02e2e]">*</span>}
+      </label>
+      <div
+        className={`flex min-h-12 items-center gap-2 rounded-lg border bg-[#1a1a1a] px-3 transition-colors ${
+          error
+            ? "border-red-500 focus-within:ring-2 focus-within:ring-red-500"
+            : "border-gray-600 focus-within:border-transparent focus-within:ring-2 focus-within:ring-[#b02e2e]"
+        }`}
+      >
+        <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-gray-500">
+          {icon}
+        </span>
+        <input
+          className="min-w-0 flex-1 bg-transparent py-3 text-sm text-white placeholder-gray-400 outline-none"
+          required={required}
+          {...props}
+        />
+        {action}
+      </div>
+      {error && <p className="text-sm text-red-500">{error}</p>}
     </div>
   );
 }

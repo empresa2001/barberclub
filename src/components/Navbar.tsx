@@ -104,11 +104,11 @@ export default function Navbar() {
       <header className={`sticky top-0 z-50 transition-all duration-300 ${
         scrolled ? 'bg-[#1a1a1a]/98 shadow-lg shadow-black/30' : 'bg-[#1a1a1a]/90'
       } backdrop-blur-xl border-b border-white/8`}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 flex items-center justify-between h-16 gap-3">
 
           {/* Logo */}
-          <Link href="/" className="flex-shrink-0">
-            <Logo size="md" />
+          <Link href="/" className="flex-shrink-0 min-w-0">
+            <Logo size="sm" />
           </Link>
 
           {/* Desktop nav */}
@@ -155,7 +155,7 @@ export default function Navbar() {
             className="md:hidden fixed inset-0 bg-black/50 z-40"
             onClick={() => setMenuOpen(false)}
           />
-          <div className="md:hidden fixed top-16 left-0 right-0 z-40 bg-[#1a1a1a] border-b border-white/10 shadow-xl">
+          <div className="md:hidden fixed top-16 left-0 right-0 z-40 max-h-[calc(100dvh-4rem)] overflow-y-auto bg-[#1a1a1a] border-b border-white/10 shadow-xl">
             <nav className="px-4 py-4 space-y-1">
               {navLinks.map((link) => (
                 <Link
