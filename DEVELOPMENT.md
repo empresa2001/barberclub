@@ -193,3 +193,5 @@ npx tsc --noEmit
 
 **Estado**: ✅ Base del proyecto completada y funcionando
 **Próximo paso**: Implementar sistema de autenticación
+
+<!-- redeploy: 2026-06-22 -->
